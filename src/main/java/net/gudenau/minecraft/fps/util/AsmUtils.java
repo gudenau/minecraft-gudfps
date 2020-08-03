@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
@@ -371,6 +372,24 @@ public class AsmUtils{
             
             visitor.visitEnd();
             return findMethod(classNode, name, description).get();
+        }
+    }
+    
+    public static int opcodeFromHandle(Handle handle){
+        switch(handle.getTag()){
+            case H_GETFIELD: return GETFIELD;
+            case H_GETSTATIC: return GETSTATIC;
+            case H_PUTFIELD: return PUTFIELD;
+            case H_PUTSTATIC: return PUTSTATIC;
+            case H_INVOKEVIRTUAL: return INVOKEVIRTUAL;
+            case H_INVOKESTATIC: return INVOKESTATIC;
+            case H_INVOKESPECIAL: return INVOKESPECIAL;
+            case H_NEWINVOKESPECIAL: return NEW;
+            case H_INVOKEINTERFACE: return INVOKEINTERFACE;
+            default: throw new IllegalArgumentException(String.format(
+                "Unknown handle type: %d",
+                handle.getTag()
+            ));
         }
     }
 }

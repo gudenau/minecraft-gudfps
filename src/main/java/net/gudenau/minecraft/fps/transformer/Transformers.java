@@ -14,6 +14,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.gudenau.minecraft.fps.GudFPS;
 import org.objectweb.asm.ClassReader;
@@ -122,25 +124,39 @@ public class Transformers{
         return newClass;
     }
     
-    private static void dumpClass(ClassNode node, byte[] bytecode){
-        try{
-            Path dumpPath = Paths.get(".", "gud_fps", "dump", node.name + ".class");
-            Path parent = dumpPath.getParent();
-            if(!Files.exists(parent)){
-                try{
-                    Files.createDirectories(parent);
-                }catch(IOException ignored){}
-            }
-            if(!Files.exists(dumpPath)){
-                try{
-                    Files.createFile(dumpPath);
-                }catch(IOException ignored){}
-            }
-            try(OutputStream stream = Files.newOutputStream(dumpPath)){
-                stream.write(bytecode);
-            }
-        }catch(IOException e){
-            e.printStackTrace();
+    private static final ExecutorService DUMP_SERVICE;
+    static {
+        if(dumpClasses | forceDumpClasses){
+            DUMP_SERVICE = Executors.newFixedThreadPool(1);
+            Runtime.getRuntime().addShutdownHook(new Thread(DUMP_SERVICE::shutdown, "Dump Service Closer"));
+        }else{
+            DUMP_SERVICE = null;
         }
+    }
+    
+    private static void dumpClass(ClassNode node, byte[] bytecode){
+        DUMP_SERVICE.submit(()->{
+            try{
+                Path dumpPath = Paths.get(".", "gud_fps", "dump", node.name + ".class");
+                Path parent = dumpPath.getParent();
+                if(!Files.exists(parent)){
+                    try{
+                        Files.createDirectories(parent);
+                    }catch(IOException ignored){
+                    }
+                }
+                if(!Files.exists(dumpPath)){
+                    try{
+                        Files.createFile(dumpPath);
+                    }catch(IOException ignored){
+                    }
+                }
+                try(OutputStream stream = Files.newOutputStream(dumpPath)){
+                    stream.write(bytecode);
+                }
+            }catch(IOException e){
+                e.printStackTrace();
+            }
+        });
     }
 }

@@ -49,6 +49,23 @@ public class ArrayUtils{
     }
     
     /**
+     * Checks if a value is inside an array.
+     *
+     * @param array The array to check
+     * @param value The value to check for
+     *
+     * @return True if the array contains the value
+     * */
+    public static <T> boolean contains(T[] array, T value){
+        for(T element : array){
+            if(element.equals(value)){
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
      * Adds an element to the front of an array.
      *
      * @param prefix The element to add

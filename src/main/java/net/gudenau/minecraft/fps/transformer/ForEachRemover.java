@@ -1,9 +1,13 @@
 package net.gudenau.minecraft.fps.transformer;
 
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import net.gudenau.minecraft.fps.util.AsmUtils;
+import net.gudenau.minecraft.fps.util.LockUtils;
+import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
@@ -11,120 +15,157 @@ import org.objectweb.asm.tree.*;
 import static org.objectweb.asm.Opcodes.*;
 
 public class ForEachRemover implements Transformer{
+    private static final Map<String, Boolean> INTERFACE_MAP = new HashMap<>();
+    private static final ReentrantReadWriteLock INTERFACE_MAP_LOCK = new ReentrantReadWriteLock();
+    
+    private final Stats stats = Stats.getStats("forEach Remover");
+    
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
-        boolean changed = false;
+        AtomicBoolean changed = new AtomicBoolean(false);
+        
+        LockUtils.withWriteLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.put(classNode.name, (classNode.access & ACC_INTERFACE) != 0));
         
         for(MethodNode method : classNode.methods){
-            Set<MethodInsnNode> nodes = AsmUtils.findMethodCalls(
-                method.instructions,
-                INVOKEINTERFACE,
-                "java/util/List",
-                "forEach",
-                "(Ljava/util/function/Consumer;)V"
-            );
-            if(nodes.isEmpty()){
-                continue;
-            }
-            System.out.printf("%s.%s%s\n", classNode.name, method.name, method.desc);
-            for(MethodInsnNode node : nodes){
-                removeForEach(method, node);
-            }
-            changed = true;
-        }
-        
-        if(changed){
-            flags.requestMaxes();
-        }
-        
-        return changed;
-    }
+            InsnList instructions = method.instructions;
+            AsmUtils.<InvokeDynamicInsnNode>findNodes(instructions, (node)->{
+                // Get all the dynamic nodes that look right
+                if(node instanceof InvokeDynamicInsnNode){
+                    InvokeDynamicInsnNode invoke = (InvokeDynamicInsnNode)node;
+                    return "accept".equals(invoke.name) && "()Ljava/util/function/Consumer;".equals(invoke.desc);
+                }
+                return false;
+            }).stream()
+            .filter((node)->{
+                // Make sure the consumers go into a foreach
+                AbstractInsnNode next = node.getNext();
+                if(next instanceof MethodInsnNode){
+                    MethodInsnNode insn = (MethodInsnNode)next;
+                    return "forEach".equals(insn.name) && "(Ljava/util/function/Consumer;)V".equals(insn.desc);
+                }
+                return false;
+            }).forEach((invokeDynamic)->{
+                MethodInsnNode methodNode = (MethodInsnNode)invokeDynamic.getNext();
+                
+                // Transform them
+                
+                // Extra info from existing instructions
+                Handle targetHandle = (Handle)invokeDynamic.bsmArgs[1];
+                int targetOpcode = AsmUtils.opcodeFromHandle(targetHandle);
+                Type targetType = (Type)invokeDynamic.bsmArgs[2];
+                
+                // Figure out our starting indices
+                int maxLocals = method.maxLocals;
     
-    private void removeForEach(MethodNode method, MethodInsnNode methodNode){
-        InvokeDynamicInsnNode dynamicNode = AsmUtils.getLastNode(methodNode, INVOKEDYNAMIC);
-        if(dynamicNode == null){
-            return;
-        }
-        
-        /*
-        Stack layout before INVOKEDYNAMIC:
-         - List to iterate
-         - Lambda captures
-         
-        Stack layout after INVOKEDYNAMIC:
-         - List to iterate
-         - Lambda handle
-         */
-        
-        Handle lambdaHandle = (Handle)dynamicNode.bsmArgs[1];
-        Type[] lambdaHandleArguments = Type.getType(lambdaHandle.getDesc()).getArgumentTypes();
-        Type lambdaArgument = (Type)dynamicNode.bsmArgs[2];
-        String lambdaArgumentClass = lambdaArgument.getArgumentTypes()[0].getInternalName();
-        
-        Type[] lambdaParams = Type.getType(lambdaHandle.getDesc()).getArgumentTypes();
-        
-        List<VarInsnNode> lambdaCaptures = AsmUtils.getLastNodes(dynamicNode, lambdaParams.length - 1);
-        
-        int iteratorLocation = method.maxLocals;
-        int argumentLocation = iteratorLocation + 1;
+                List<LocalVariableNode> localVariables = method.localVariables;
+                if(localVariables != null){
+                    for(LocalVariableNode localVariable : method.localVariables){
+                        maxLocals = Math.max(localVariable.index, maxLocals);
+                    }
+                }
+                
+                // Figure out our locals
+                int localIterator = maxLocals++;
+                //int localObject = maxLocals++;
+                
+                // Store the new max
+                method.maxLocals = maxLocals;
+                
+                // Figure out the collection
+                String collection = methodNode.owner;
+                boolean isCollectionInterface;
+                try{
+                    // Is this really the best way?
+                    Boolean bool = LockUtils.withReadLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.get(collection));
+                    if(bool == null){
+                        Class<?> collectionClass = getClass().getClassLoader().loadClass(collection.replaceAll("/", "."));
+                        isCollectionInterface = collectionClass.isInterface();
+                        LockUtils.withWriteLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.put(collection, isCollectionInterface));
+                    }else{
+                        isCollectionInterface = bool;
+                    }
+                }catch(ClassNotFoundException ignored){
+                    stats.incrementStat("failed");
+                    return;
+                }
     
-        InsnList patch = new InsnList();
-        // Iterator<T> iterator = List<T>.iterator();
-        patch.add(new MethodInsnNode(INVOKEINTERFACE, "java/util/List", "iterator", "()Ljava/util/Iterator;", true));
-        patch.add(new VarInsnNode(ASTORE, iteratorLocation));
-        
-        // while(iterator.hasNext()){
-        LabelNode loopNode = new LabelNode();
-        patch.add(loopNode);
-        
-        Object[] locals = new Object[lambdaCaptures.size() + 2];
-        locals[0] = "java/util/List";
-        for(int i = 0; i < locals.length - 2; i++){
-            locals[i + 1] = lambdaHandleArguments[i].getInternalName();
+                // Build the for-each loop
+                InsnList patch = new InsnList();
+                LabelNode breakNode = new LabelNode();
+                LabelNode continueNode = new LabelNode();
+                
+                // Iterator iter = collection.iterator();
+                patch.add(new MethodInsnNode(
+                    isCollectionInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
+                    collection,
+                    "iterator",
+                    "()Ljava/util/Iterator;",
+                    isCollectionInterface
+                ));
+                patch.add(new VarInsnNode(ASTORE, localIterator));
+                
+                // while(iter.hasNext()){
+                patch.add(continueNode);
+                patch.add(new FrameNode(
+                    F_APPEND,
+                    1, new Object[]{"java/util/Iterator"},
+                    0, null
+                ));
+                patch.add(new VarInsnNode(ALOAD, localIterator));
+                patch.add(new MethodInsnNode(
+                    INVOKEINTERFACE,
+                    "java/util/Iterator",
+                    "hasNext",
+                    "()Z",
+                    true
+                ));
+                patch.add(new JumpInsnNode(IFEQ, breakNode));
+                
+                //   lambda(iter.next());
+                patch.add(new VarInsnNode(ALOAD, localIterator));
+                patch.add(new MethodInsnNode(
+                    INVOKEINTERFACE,
+                    "java/util/Iterator",
+                    "next",
+                    "()Ljava/lang/Object;",
+                    true
+                ));
+                
+                Type targetMethod = Type.getMethodType(targetHandle.getDesc());
+                Type[] targetArgs = targetMethod.getArgumentTypes();
+                boolean passObject = targetArgs.length == targetType.getArgumentTypes().length;
+                
+                patch.add(new TypeInsnNode(
+                    CHECKCAST,
+                    passObject ? targetArgs[targetArgs.length - 1].getInternalName() : targetHandle.getOwner()
+                ));
+                patch.add(new MethodInsnNode(
+                    targetOpcode,
+                    targetHandle.getOwner(),
+                    targetHandle.getName(),
+                    targetHandle.getDesc(),
+                    targetOpcode == INVOKEINTERFACE
+                ));
+                
+                // }
+                patch.add(new JumpInsnNode(GOTO, continueNode));
+                patch.add(breakNode);
+                patch.add(new FrameNode(F_CHOP, 0, null, 0, null));
+    
+                instructions.insertBefore(invokeDynamic, patch);
+                instructions.remove(invokeDynamic);
+                instructions.remove(methodNode);
+                
+                changed.set(true);
+                stats.incrementStat("success");
+            });
         }
-        locals[locals.length - 1] = "java/util/Iterator";
         
-        patch.add(new FrameNode(
-            F_FULL,
-            locals.length,
-            locals,
-            0,
-            null
-        ));
-        patch.add(new VarInsnNode(ALOAD, iteratorLocation));
-        patch.add(new MethodInsnNode(INVOKEINTERFACE, "java/util/Iterator", "hasNext", "()Z", true));
-        LabelNode jumpNode = new LabelNode();
-        patch.add(new JumpInsnNode(IFEQ, jumpNode));
-        
-        //     T element = iterator.next();
-        patch.add(new VarInsnNode(ALOAD, iteratorLocation));
-        patch.add(new MethodInsnNode(INVOKEINTERFACE, "java/util/Iterator", "next", "()Ljava/lang/Object;", true));
-        patch.add(new TypeInsnNode(CHECKCAST, lambdaArgumentClass));
-        patch.add(new VarInsnNode(ASTORE, argumentLocation));
-        
-        //    lambda(captures, element);
-        Collections.reverse(lambdaCaptures);
-        lambdaCaptures.forEach((node)->
-            patch.add(new VarInsnNode(node.getOpcode(), node.var))
-        );
-        patch.add(new VarInsnNode(ALOAD, argumentLocation));
-        patch.add(new MethodInsnNode(
-            AsmUtils.handleTagToOpcode(lambdaHandle.getTag()),
-            lambdaHandle.getOwner(),
-            lambdaHandle.getName(),
-            lambdaHandle.getDesc(),
-            lambdaHandle.isInterface()
-        ));
-        
-        // }
-        patch.add(new JumpInsnNode(GOTO, loopNode));
-        patch.add(new FrameNode(F_CHOP, 1, null, 0, null));
-        
-        InsnList insnList = method.instructions;
-        
-        insnList.insert(methodNode, patch);
-        lambdaCaptures.forEach(insnList::remove);
-        insnList.remove(dynamicNode);
-        insnList.remove(methodNode);
+        if(changed.get()){
+            flags.requestFrames();
+            return true;
+        }else{
+            return false;
+        }
     }
 }
