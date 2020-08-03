@@ -8,9 +8,15 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import net.gudenau.minecraft.fps.util.ArrayUtils;
 import net.gudenau.minecraft.fps.util.AsmUtils;
+import net.gudenau.minecraft.fps.util.Pair;
+import org.apache.commons.lang3.BitField;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
@@ -45,10 +51,6 @@ public class BlockPosRemover implements Transformer{
         );
         
         classNode.methods.forEach((method)->{
-            if(classNode.name.equals("net/minecraft/util/Util") && method.name.equals("createServerWorkerExecutor")){
-                System.out.print("");
-            }
-            
             InsnList instructions = method.instructions;
     
             Type oldMethodDesc = Type.getType(method.desc);
@@ -56,133 +58,22 @@ public class BlockPosRemover implements Transformer{
             method.desc = newMethodDesc.getDescriptor();
             //FIXME
             method.signature = null;
-            
-            List<LocalVariableNode> localVariables = method.localVariables;
-            if(localVariables != null && !localVariables.isEmpty()){
-                List<LabelNode> labels = AsmUtils.findNodesOrdered(instructions, LabelNode.class);
-                Object2IntMap<LabelNode> labelToPositions = new Object2IntOpenHashMap<>();
-                Int2ObjectMap<LabelNode> positionToLabels = new Int2ObjectOpenHashMap<>();
-                for(int i = 0; i < labels.size(); i++){
-                    LabelNode label = labels.get(i);
-                    labelToPositions.put(label, i);
-                    positionToLabels.put(i, label);
-                }
-                
-                List<LocalVariableNode> sortedLocals = new ArrayList<>(localVariables);
-                sortedLocals.sort((a, b)->{
-                    int startA = labelToPositions.getInt(a.start);
-                    int startB = labelToPositions.getInt(b.start);
-                    if(startA != startB){
-                        return Integer.compare(startA, startB);
-                    }else{
-                        return Integer.compare(a.index, b.index);
-                    }
-                });
-                
-                Int2ObjectMap<ArrayList<LocalVariableNode>> starts = new Int2ObjectOpenHashMap<>();
-                Int2ObjectMap<ArrayList<LocalVariableNode>> ends = new Int2ObjectOpenHashMap<>();
     
-                for(LocalVariableNode local : sortedLocals){
-                    starts.computeIfAbsent(labelToPositions.getInt(local.start), (k)->new ArrayList<>()).add(local);
-                    ends.computeIfAbsent(labelToPositions.getInt(local.end), (k)->new ArrayList<>()).add(local);
-                }
-                
-                Int2ObjectMap<LocalVariableNode> usedLocals = new Int2ObjectOpenHashMap<>();
-    
-                Int2IntMap positionMap = new Int2IntOpenHashMap();
-                
-                boolean unityLocals = false;
-                
-                for(AbstractInsnNode instruction : instructions){
-                    if(instruction instanceof LabelNode){
-                        int location = labelToPositions.getInt(instruction);
-    
-                        ArrayList<LocalVariableNode> locals = ends.get(location);
-                        if(locals != null){
-                            for(LocalVariableNode local : locals){
-                                int size = Type.getType(local.desc).getSize();
-                                if(size == 0){
-                                    continue;
-                                }
-                                
-                                positionMap.remove(local.index);
-                                for(int i = 0; i < size; i++){
-                                    usedLocals.remove(local.index + i);
-                                }
-                            }
-                            
-                            if(!unityLocals){
-                                unityLocals = true;
-                                for(Int2IntMap.Entry entry : positionMap.int2IntEntrySet()){
-                                    if(entry.getIntKey() != entry.getIntValue()){
-                                        unityLocals = false;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        
-                        locals = starts.get(location);
-                        if(locals != null){
-                            for(LocalVariableNode local : locals){
-                                int size = Type.getType(local.desc).getSize();
-                                if(size == 0){
-                                    continue;
-                                }
-                                int localOffset;
-                                outer:
-                                for(localOffset = 0; true; localOffset++){
-                                    for(int i = 0; i < size; i++){
-                                        if(usedLocals.containsKey(localOffset)){
-                                            continue outer;
-                                        }
-                                    }
-                                    break;
-                                }
-                                positionMap.put(local.index, localOffset);
-                                local.index = localOffset;
-                                for(int i = 0; i < size; i++){
-                                    usedLocals.put(localOffset + i, local);
-                                }
-                            }
-                            
-                            unityLocals = true;
-                            for(Int2IntMap.Entry entry : positionMap.int2IntEntrySet()){
-                                if(entry.getIntKey() != entry.getIntValue()){
-                                    unityLocals = false;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    if(!unityLocals && instruction instanceof VarInsnNode){
-                        VarInsnNode var = (VarInsnNode)instruction;
-                        var.var = positionMap.computeIfAbsent(var.var, (k)->{
-                            System.err.printf(
-                                "Unknown var %d in %s.%s%s for opcode %s\n",
-                                k,
-                                classNode.name.replaceAll("/", "."),
-                                method.name,
-                                method.desc,
-                                AsmUtils.opcodeName(var.getOpcode())
-                            );
-                            return k;
-                        });
-                    }
-                }
-            }
-            
-            AsmUtils.findNodes(instructions, (node)->
-                node.getOpcode() == NEW && ((TypeInsnNode)node).desc.equals("net/minecraft/util/math/BlockPos")
-            ).forEach(instructions::remove);
-            
             AsmUtils.<FrameNode>findNodes(instructions, (node)->
                 node.getType() == FRAME
             ).forEach((node)->{
                 fixFrameTypes(node.local);
                 fixFrameTypes(node.stack);
             });
+            
+            List<LocalVariableNode> localVariables = method.localVariables;
+            if(localVariables != null && !localVariables.isEmpty()){
+                fixupLocals(oldMethodDesc, newMethodDesc, method);
+            }
+            
+            AsmUtils.findNodes(instructions, (node)->
+                node.getOpcode() == NEW && ((TypeInsnNode)node).desc.equals("net/minecraft/util/math/BlockPos")
+            ).forEach(instructions::remove);
 
             AsmUtils.<MethodInsnNode>findNodes(
                 instructions,
@@ -201,6 +92,51 @@ public class BlockPosRemover implements Transformer{
         
         //TODO
         return true;
+    }
+    
+    private void fixupLocals(Type oldDescriptor, Type newDescriptor, MethodNode method){
+        Int2IntMap localMap = new Int2IntOpenHashMap();
+    
+        { // Compute initial locals
+            int oldLocals = 0;
+            int newLocals = 0;
+            if((method.access & ACC_STATIC) == 0){
+                localMap.put(0, 0);
+                oldLocals++;
+                newLocals++;
+            }
+            
+            Type[] oldArguments = oldDescriptor.getArgumentTypes();
+            Type[] newArguments = newDescriptor.getArgumentTypes();
+            for(int i = 0; i < oldArguments.length; i++){
+                Type oldArgument = oldArguments[i];
+                Type newArgument = newArguments[i];
+                int oldSize = oldArgument.getSize();
+                int newSize = newArgument.getSize();
+                for(int o = 0; o < newSize; o++){
+                    localMap.put(oldLocals + o, newLocals);
+                }
+                oldLocals += oldSize;
+                newLocals += newSize;
+            }
+        }
+        
+        AbstractInsnNode instruction = method.instructions.getFirst();
+        while(instruction != null){
+            if(instruction instanceof FrameNode){
+                FrameNode frame = (FrameNode)instruction;
+                switch(frame.type){
+                    default:{
+                        System.out.println("Implement frame of type" + frame.type);
+                    } break;
+                }
+            }else if(instruction instanceof VarInsnNode){
+                VarInsnNode varNode = (VarInsnNode)instruction;
+                varNode.var = localMap.getOrDefault(varNode.var, Byte.MAX_VALUE);
+            }
+            
+            instruction = instruction.getNext();
+        }
     }
     
     private static final int[] LOAD_OPS = {

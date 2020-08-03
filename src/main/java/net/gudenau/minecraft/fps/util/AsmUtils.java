@@ -134,6 +134,10 @@ public class AsmUtils{
         return nodes;
     }
     
+    public static <T extends AbstractInsnNode> Set<T> findNodes(InsnList instructions, Class<T> type){
+        return findNodes(instructions, type::isInstance);
+    }
+    
     @SuppressWarnings("unchecked")
     public static <T extends AbstractInsnNode> Set<T> findNodes(InsnList instructions, Function<AbstractInsnNode, Boolean> check){
         Set<T> nodes = new HashSet<>();
