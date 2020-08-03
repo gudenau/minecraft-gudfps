@@ -8,16 +8,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 import net.gudenau.minecraft.fps.GudFPS;
+import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
@@ -29,8 +26,8 @@ public class Transformers{
     private static final boolean dumpClasses = GudFPS.CONFIG.dump.get();
     private static final boolean forceDumpClasses = GudFPS.CONFIG.forceDump.get();
     private static final boolean verifyClasses = GudFPS.CONFIG.verify.get();
-    private static final boolean countChanges = GudFPS.CONFIG.countChanges.get();
-    private static final Map<Transformer, AtomicInteger> changes = countChanges ? Collections.synchronizedMap(new HashMap<>()) : null;
+    private static final Stats transformerStats = Stats.getStats("Transformer");
+    private static final Stats dumperStats = Stats.getStats("Dump");
     
     static {
         GudFPS.Config config = GudFPS.CONFIG;
@@ -41,21 +38,6 @@ public class Transformers{
         config.removeBlockPos.doIf(true, ()->register(new BlockPosRemover()));
         config.rpmalloc.doIf(true, ()->register(new RPmallocTransformer()));
         config.optimizeMath.doIf(true, ()->register(new MathOptimizer()));
-        if(countChanges){
-            Runtime.getRuntime().addShutdownHook(new Thread(()->{
-                StringBuilder stringBuilder = new StringBuilder();
-                stringBuilder.append("Used transformers:\n");
-                for(Map.Entry<Transformer, AtomicInteger> entry : changes.entrySet()){
-                    stringBuilder
-                        .append("\t")
-                        .append(entry.getKey().getClass().getSimpleName())
-                        .append(": ")
-                        .append(entry.getValue().get())
-                        .append("\n");
-                }
-                System.out.printf("%s", stringBuilder.toString());
-            }));
-        }
     }
     
     private static void register(Transformer transformer){
@@ -81,6 +63,7 @@ public class Transformers{
         
         if(usedTransformers.isEmpty()){
             if(dumpClasses && forceDumpClasses){
+                dumperStats.incrementStat("forced");
                 dumpClass(classNode, basicClass);
             }
             return basicClass;
@@ -94,16 +77,15 @@ public class Transformers{
         for(Transformer transformer : usedTransformers){
             System.out.printf("    %s\n", transformer.getClass().getSimpleName());
         }
-        if(countChanges){
-            for(Transformer transformer : usedTransformers){
-                changes.computeIfAbsent(transformer, (t)-> new AtomicInteger()).incrementAndGet();
-            }
+        for(Transformer transformer : usedTransformers){
+            transformerStats.incrementStat(transformer.getClass().getSimpleName());
         }
         
         ClassWriter classWriter = new ClassWriter(flags.getFlags());
         classNode.accept(classWriter);
         byte[] newClass = classWriter.toByteArray();
         if(dumpClasses){
+            dumperStats.incrementStat("modified");
             dumpClass(classNode, newClass);
         }
         if(verifyClasses){

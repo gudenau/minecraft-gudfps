@@ -3,6 +3,7 @@ package net.gudenau.minecraft.fps.transformer;
 import java.util.Set;
 import net.gudenau.minecraft.fps.util.ArrayUtils;
 import net.gudenau.minecraft.fps.util.AsmUtils;
+import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
@@ -41,6 +42,8 @@ public class ConstantPrecomputer implements Transformer{
         DCONST_0, DCONST_1
     };
     
+    private final Stats stats = Stats.getStats("Constant Prcomputer");
+    
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
         boolean changed = false;
@@ -75,12 +78,24 @@ public class ConstantPrecomputer implements Transformer{
         AbstractInsnNode replacement;
         if(ArrayUtils.contains(INSTRUCTIONS_INT, opcode)){
             replacement = transformInt(operationNode, arg1, arg2);
+            if(replacement != null){
+                stats.incrementStat("int");
+            }
         }else if(ArrayUtils.contains(INSTRUCTIONS_FLOAT, opcode)){
             replacement = transformFloat(operationNode, arg1, arg2);
+            if(replacement != null){
+                stats.incrementStat("float");
+            }
         }else if(ArrayUtils.contains(INSTRUCTIONS_LONG, opcode)){
             replacement = transformLong(operationNode, arg1, arg2);
+            if(replacement != null){
+                stats.incrementStat("long");
+            }
         }else if(ArrayUtils.contains(INSTRUCTIONS_DOUBLE, opcode)){
             replacement = transformDouble(operationNode, arg1, arg2);
+            if(replacement != null){
+                stats.incrementStat("double");
+            }
         }else{
             return false;
         }
@@ -143,36 +158,47 @@ public class ConstantPrecomputer implements Transformer{
         switch(operationNode.getOpcode()){
             case IADD:{
                 result = constant1 + constant2;
+                stats.incrementStat("add");
             } break;
             case ISUB:{
                 result = constant1 - constant2;
+                stats.incrementStat("sub");
             } break;
             case IMUL:{
                 result = constant1 * constant2;
+                stats.incrementStat("mul");
             } break;
             case IDIV:{
                 result = constant1 / constant2;
+                stats.incrementStat("div");
             } break;
             case IREM:{
                 result = constant1 % constant2;
+                stats.incrementStat("mod");
             } break;
             case IXOR:{
                 result = constant1 ^ constant2;
+                stats.incrementStat("xor");
             } break;
             case IOR:{
                 result = constant1 | constant2;
+                stats.incrementStat("or");
             } break;
             case IAND:{
                 result = constant1 & constant2;
+                stats.incrementStat("and");
             } break;
             case ISHL:{
                 result = constant1 << constant2;
+                stats.incrementStat("left shift");
             } break;
             case ISHR:{
                 result = constant1 >> constant2;
+                stats.incrementStat("right shift");
             } break;
             case IUSHR:{
                 result = constant1 >>> constant2;
+                stats.incrementStat("logical right shift");
             } break;
             default: return null;
         }
@@ -218,18 +244,23 @@ public class ConstantPrecomputer implements Transformer{
         switch(operationNode.getOpcode()){
             case FADD:{
                 result = constant1 + constant2;
+                stats.incrementStat("add");
             } break;
             case FSUB:{
                 result = constant1 - constant2;
+                stats.incrementStat("sub");
             } break;
             case FMUL:{
                 result = constant1 * constant2;
+                stats.incrementStat("mul");
             } break;
             case FDIV:{
                 result = constant1 / constant2;
+                stats.incrementStat("div");
             } break;
             case FREM:{
                 result = constant1 % constant2;
+                stats.incrementStat("mod");
             } break;
             default: return null;
         }
@@ -263,36 +294,47 @@ public class ConstantPrecomputer implements Transformer{
         switch(operationNode.getOpcode()){
             case LADD:{
                 result = constant1 + constant2;
+                stats.incrementStat("add");
             } break;
             case LSUB:{
                 result = constant1 - constant2;
+                stats.incrementStat("sub");
             } break;
             case LMUL:{
                 result = constant1 * constant2;
+                stats.incrementStat("mul");
             } break;
             case LDIV:{
                 result = constant1 / constant2;
+                stats.incrementStat("div");
             } break;
             case LREM:{
                 result = constant1 % constant2;
+                stats.incrementStat("mod");
             } break;
             case LXOR:{
                 result = constant1 ^ constant2;
+                stats.incrementStat("xor");
             } break;
             case LOR:{
                 result = constant1 | constant2;
+                stats.incrementStat("or");
             } break;
             case LAND:{
                 result = constant1 & constant2;
+                stats.incrementStat("and");
             } break;
             case LSHL:{
                 result = constant1 << constant2;
+                stats.incrementStat("left shift");
             } break;
             case LSHR:{
                 result = constant1 >> constant2;
+                stats.incrementStat("right shift");
             } break;
             case LUSHR:{
                 result = constant1 >>> constant2;
+                stats.incrementStat("logical right shift");
             } break;
             default: return null;
         }
@@ -324,18 +366,23 @@ public class ConstantPrecomputer implements Transformer{
         switch(operationNode.getOpcode()){
             case DADD:{
                 result = constant1 + constant2;
+                stats.incrementStat("add");
             } break;
             case DSUB:{
                 result = constant1 - constant2;
+                stats.incrementStat("sub");
             } break;
             case DMUL:{
                 result = constant1 * constant2;
+                stats.incrementStat("mul");
             } break;
             case DDIV:{
                 result = constant1 / constant2;
+                stats.incrementStat("div");
             } break;
             case DREM:{
                 result = constant1 % constant2;
+                stats.incrementStat("mod");
             } break;
             default: return null;
         }

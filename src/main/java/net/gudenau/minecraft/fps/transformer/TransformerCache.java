@@ -3,7 +3,6 @@ package net.gudenau.minecraft.fps.transformer;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -19,6 +18,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import net.gudenau.minecraft.fps.GudFPS;
 import net.gudenau.minecraft.fps.fixes.RPMallocFixes;
+import net.gudenau.minecraft.fps.util.LockUtils;
+import net.gudenau.minecraft.fps.util.Stats;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.lz4.LZ4;
 import org.lwjgl.util.xxhash.XXHash;
@@ -32,13 +33,15 @@ public class TransformerCache{
     
     private static volatile Long2ObjectMap<ByteBuffer> cache;
     private static final ReentrantReadWriteLock cacheLock = new ReentrantReadWriteLock();
+    private static Stats stats;
     
     public static void load(){
         enabled = GudFPS.CONFIG.enableCache.get();
         if(!enabled){
-            
             return;
         }
+        
+        stats = Stats.getStats("Cache");
         
         cache = new Long2ObjectOpenHashMap<>();
         
@@ -52,52 +55,52 @@ public class TransformerCache{
     }
     
     private static void loadCache(){
-        final Lock lock = cacheLock.writeLock();
-        lock.lock();
-        try{
-            if(Files.exists(CACHE_PATH)){
-                try(RandomAccessFile file = new RandomAccessFile(CACHE_PATH.toFile(), "r")){
-                    MappedByteBuffer fileBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, file.length());
-                    fileBuffer.order(ByteOrder.LITTLE_ENDIAN);
+        LockUtils.withWriteLock(cacheLock, ()->{
+            try{
+                if(Files.exists(CACHE_PATH)){
+                    try(RandomAccessFile file = new RandomAccessFile(CACHE_PATH.toFile(), "r")){
+                        MappedByteBuffer fileBuffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, file.length());
+                        fileBuffer.order(ByteOrder.LITTLE_ENDIAN);
                 
-                    long savedSeed = fileBuffer.getLong();
-                    if(savedSeed != SEED){
-                        return;
-                    }
-                
-                    int config = fileBuffer.getInt();
-                    if(config != GudFPS.CONFIG.hashCode()){
-                        return;
-                    }
-                
-                    int cacheSize = fileBuffer.getInt();
-                    for(int i = 0; i < cacheSize; i++){
-                        long hash = fileBuffer.getLong();
-                        int rawSize = fileBuffer.getInt();
-                        int compressedSize = fileBuffer.getInt();
-                        fileBuffer.limit(compressedSize + fileBuffer.position());
-                        try{
-                            ByteBuffer buffer = MemoryUtil.memAlloc(rawSize);
-                            int result = LZ4.LZ4_decompress_safe(fileBuffer, buffer);
-                            if(result < 0){
-                                throw new RuntimeException("Failed to decompress cache (" + result + ")");
-                            }else if(result != rawSize){
-                                throw new RuntimeException("Failed to decompress cache (bad size)");
-                            }
-                            cache.put(hash, buffer);
-                        }finally{
-                            fileBuffer.position(fileBuffer.limit());
-                            fileBuffer.limit(fileBuffer.capacity());
+                        long savedSeed = fileBuffer.getLong();
+                        if(savedSeed != SEED){
+                            return;
                         }
+                
+                        int config = fileBuffer.getInt();
+                        if(config != GudFPS.CONFIG.hashCode()){
+                            return;
+                        }
+                
+                        int cacheSize = fileBuffer.getInt();
+                        stats.addStat("loaded", cacheSize);
+                        for(int i = 0; i < cacheSize; i++){
+                            long hash = fileBuffer.getLong();
+                            int rawSize = fileBuffer.getInt();
+                            int compressedSize = fileBuffer.getInt();
+                            fileBuffer.limit(compressedSize + fileBuffer.position());
+                            try{
+                                ByteBuffer buffer = MemoryUtil.memAlloc(rawSize);
+                                int result = LZ4.LZ4_decompress_safe(fileBuffer, buffer);
+                                if(result < 0){
+                                    throw new RuntimeException("Failed to decompress cache (" + result + ")");
+                                }else if(result != rawSize){
+                                    throw new RuntimeException("Failed to decompress cache (bad size)");
+                                }
+                                cache.put(hash, buffer);
+                            }finally{
+                                fileBuffer.position(fileBuffer.limit());
+                                fileBuffer.limit(fileBuffer.capacity());
+                            }
+                        }
+                    }catch(IOException e){
+                        e.printStackTrace();
                     }
-                }catch(IOException e){
-                    e.printStackTrace();
                 }
+            }finally{
+                loaded = true;
             }
-        }finally{
-            loaded = true;
-            lock.unlock();
-        }
+        });
     }
     
     private static void saveCache(){
@@ -121,6 +124,7 @@ public class TransformerCache{
                 arrayBuffer.putLong(SEED);
                 arrayBuffer.putInt(GudFPS.CONFIG.hashCode());
                 arrayBuffer.putInt(cache.size());
+                stats.addStat("saved", cache.size());
                 outputStream.write(array, 0, arrayBuffer.position());
                 arrayBuffer.clear();
     
@@ -161,19 +165,6 @@ public class TransformerCache{
         }
     }
     
-    private static void read(InputStream stream, byte[] data, int size) throws IOException{
-        int remaining = size;
-        int read;
-        int offset = 0;
-        while(remaining > 0 && (read = stream.read(data, offset, remaining)) > 0){
-            remaining -= read;
-            offset += read;
-        }
-        if(remaining != 0){
-            throw new IOException("Unexpected end of stream");
-        }
-    }
-    
     public static byte[] getEntry(byte[] original){
         if(!enabled || !loaded || original == null){
             return null;
@@ -183,19 +174,17 @@ public class TransformerCache{
         try{
             originalBuffer.put(original).position(0);
             long hash = XXHash.XXH64(originalBuffer, SEED);
-            final Lock lock = cacheLock.readLock();
-            lock.lock();
-            try{
+            return LockUtils.withReadLock(cacheLock, ()->{
                 ByteBuffer modifiedBuffer = cache.get(hash);
                 if(modifiedBuffer == null){
+                    stats.incrementStat("misses");
                     return null;
                 }
+                stats.incrementStat("hits");
                 byte[] modified = new byte[modifiedBuffer.capacity()];
                 modifiedBuffer.get(modified).position(0);
                 return modified;
-            }finally{
-                lock.unlock();
-            }
+            });
         }finally{
             MemoryUtil.memFree(originalBuffer);
         }
@@ -205,6 +194,8 @@ public class TransformerCache{
         if(!enabled || original == null || modified == null){
             return;
         }
+    
+        stats.incrementStat("additions");
         
         ByteBuffer originalBuffer = MemoryUtil.memAlloc(original.length);
         try{
@@ -213,14 +204,10 @@ public class TransformerCache{
             
             originalBuffer.put(original).position(0);
             long hash = XXHash.XXH64(originalBuffer, SEED);
-            
-            final Lock lock = cacheLock.writeLock();
-            lock.lock();
-            try{
-                cache.put(hash, modifiedBuffer);
-            }finally{
-                lock.unlock();
-            }
+    
+            LockUtils.withWriteLock(cacheLock, ()->
+                cache.put(hash, modifiedBuffer)
+            );
         }finally{
             MemoryUtil.memFree(originalBuffer);
         }

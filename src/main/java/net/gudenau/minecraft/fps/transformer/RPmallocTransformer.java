@@ -3,6 +3,7 @@ package net.gudenau.minecraft.fps.transformer;
 import java.util.HashSet;
 import java.util.Set;
 import net.gudenau.minecraft.fps.util.AsmUtils;
+import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
@@ -13,6 +14,8 @@ import org.objectweb.asm.tree.MethodNode;
 import static org.objectweb.asm.Opcodes.*;
 
 public class RPmallocTransformer implements Transformer{
+    private final Stats stats = Stats.getStats("RPmalloc");
+    
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
         boolean changed = false;
@@ -38,6 +41,7 @@ public class RPmallocTransformer implements Transformer{
                 }
             });
     
+            stats.incrementStat("Thread");
             changed = true;
         }
         
@@ -61,7 +65,8 @@ public class RPmallocTransformer implements Transformer{
                     false
                 ));
             }
-            
+    
+            stats.incrementStat("ForkJoinWorkerThread");
             changed = true;
         }
         
@@ -83,6 +88,7 @@ public class RPmallocTransformer implements Transformer{
             }
     
             changed |= !threadInstructions.isEmpty();
+            stats.addStat("inits", threadInstructions.size());
     
             for(MethodInsnNode initNode : threadInstructions){
                 // Easy mode

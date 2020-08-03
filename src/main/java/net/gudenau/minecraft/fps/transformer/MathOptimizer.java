@@ -3,6 +3,7 @@ package net.gudenau.minecraft.fps.transformer;
 import java.util.Set;
 import net.gudenau.minecraft.fps.util.ArrayUtils;
 import net.gudenau.minecraft.fps.util.AsmUtils;
+import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
@@ -32,9 +33,11 @@ public class MathOptimizer implements Transformer{
         ICONST_2, ICONST_4, LDC
     };
     
+    private final Stats stats = Stats.getStats("Math Optimizer");
+    
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
-        boolean changed = true;
+        boolean changed = false;
     
         for(MethodNode method : classNode.methods){
             InsnList instructions = method.instructions;
@@ -93,6 +96,7 @@ public class MathOptimizer implements Transformer{
                     instructions.remove(isnNode);
                     
                     changed = true;
+                    stats.incrementStat("success");
                 }
                 /*
                     ILOAD 0
@@ -103,10 +107,5 @@ public class MathOptimizer implements Transformer{
         }
         
         return changed;
-    }
-    
-    private static void asdf(){
-        int a = 100;
-        int b = a / 2;
     }
 }

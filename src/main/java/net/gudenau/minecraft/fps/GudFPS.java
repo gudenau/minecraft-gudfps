@@ -23,7 +23,7 @@ public class GudFPS implements ModInitializer{
     
     @Override
     public void onInitialize(){
-        System.err.println("Thing will break, GudFPS is not meant to be 100% stable. :3");
+        System.err.println("Things will break, GudFPS is not meant to be 100% stable. :3");
     }
     
     private static Config loadConfig(){
@@ -79,7 +79,6 @@ public class GudFPS implements ModInitializer{
         public final Option<Boolean> dump = new BooleanOption("dump", false);
         public final Option<Boolean> forceDump = new BooleanOption("forceDump", false);
         public final Option<Boolean> verify = new BooleanOption("verify", false);
-        public final Option<Boolean> countChanges = new BooleanOption("countChanges", false);
     
         private Config(Map<String, String> options){
             try{
@@ -118,8 +117,7 @@ public class GudFPS implements ModInitializer{
                    Objects.equals(dump, config.dump) &&
                    Objects.equals(forceDump, config.forceDump) &&
                    Objects.equals(verify, config.verify) &&
-                   Objects.equals(optimizeMath, config.optimizeMath) &&
-                   Objects.equals(countChanges, config.countChanges);
+                   Objects.equals(optimizeMath, config.optimizeMath);
         }
     
         @Override
