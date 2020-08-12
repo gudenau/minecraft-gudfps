@@ -135,7 +135,7 @@ public class GudFPS implements ModInitializer{
     }
     
     public static final class Config{
-        public final Option<Boolean> removeForEach = new BooleanOption("removeForEach", true);
+        public final Option<Boolean> removeForEach = new BooleanOption("removeForEach", false);
         public final Option<Boolean> removeBlockPos = new BooleanOption("removeBlockPos", true);
         public final Option<Boolean> precomputeConstants = new BooleanOption("precomputeConstants", true);
         public final Option<Boolean> optimizeMath = new BooleanOption("optimizeMath", true);

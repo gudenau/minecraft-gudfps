@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import net.gudenau.minecraft.fps.GudFPS;
 import net.gudenau.minecraft.fps.util.Stats;
+import org.lwjgl.system.Platform;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
@@ -52,6 +53,17 @@ public class Transformers{
     }
     
     public static byte[] transform(String name, String transformedName, byte[] basicClass){
+        try{
+            return doTransform(name, transformedName, basicClass);
+        }catch(Throwable t){
+            System.err.printf("Failed to transform %s (%s)\n", name, transformedName);
+            t.printStackTrace();
+            System.exit(0);
+            throw new RuntimeException();
+        }
+    }
+    
+    private static byte[] doTransform(String name, String transformedName, byte[] basicClass){
         if(basicClass == null){
             return null;
         }

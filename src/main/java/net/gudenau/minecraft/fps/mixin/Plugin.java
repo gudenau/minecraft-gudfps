@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import net.gudenau.minecraft.fps.GudFPS;
 import net.gudenau.minecraft.fps.transformer.TransformerCache;
 import net.gudenau.minecraft.fps.transformer.Transformers;
+import net.gudenau.minecraft.fps.util.LibraryLoader;
 import net.gudenau.minecraft.fps.util.ReflectionHelper;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.rpmalloc.RPmalloc;
@@ -25,6 +26,22 @@ import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
 
 public class Plugin implements IMixinConfigPlugin{
     static{
+        if(!System.getProperty("os.arch").contains("64")){
+            System.err.printf(
+                "\n\n\n\n\n\n\n\n\n\n" +
+                "WARNING:\n" +
+                "It appears that you are running a 32 bit version of Java, things\n" +
+                "are very likely to break!\n" +
+                "\n\n\n\n\n\n\n\n\n\n"
+            );
+        }
+    
+        try{
+            LibraryLoader.setup();
+        }catch(IOException e){
+            throw new RuntimeException("Failed to setup required libs", e);
+        }
+    
         if(GudFPS.CONFIG.rpmalloc.get()){
             Configuration.MEMORY_ALLOCATOR.set("rpmalloc");
             RPmalloc.rpmalloc_initialize();

@@ -4,12 +4,13 @@
   "version": "${version}",
 
   "name": "Gud FPS",
-  "description": "Stupid optimizations that may or may not improve performance!",
+  "description": "Stupid optimizations that may or may not improve performance!\n\nGuaranteed to improve instability however!",
   "authors": [
     "gudenau"
   ],
   "contact": {
     "homepage": "",
+    "issues": "",
     "sources": ""
   },
 

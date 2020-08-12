@@ -39,25 +39,12 @@ dependencies {
 
 	// PSA: Some older mods, compiled on Loom 0.2.1, might have outdated Maven POMs.
 	// You may need to force-disable transitiveness on them.
-	implementation include("org.lwjgl:lwjgl-rpmalloc:${project.lwjgl_version}")
-	implementation include("org.lwjgl:lwjgl-xxhash:${project.lwjgl_version}")
-	implementation include("org.lwjgl:lwjgl-lz4:${project.lwjgl_version}")
-	runtimeOnly "org.lwjgl:lwjgl-rpmalloc::$lwjglNatives"
-	runtimeOnly "org.lwjgl:lwjgl-xxhash::$lwjglNatives"
-	runtimeOnly "org.lwjgl:lwjgl-lz4::$lwjglNatives"
-
-	include "org.lwjgl:lwjgl-rpmalloc::natives-linux"
-	include "org.lwjgl:lwjgl-rpmalloc::natives-macos"
-	include "org.lwjgl:lwjgl-rpmalloc::natives-windows"
-	include "org.lwjgl:lwjgl-rpmalloc::natives-windows-x86"
-	include "org.lwjgl:lwjgl-xxhash::natives-linux"
-	include "org.lwjgl:lwjgl-xxhash::natives-macos"
-	include "org.lwjgl:lwjgl-xxhash::natives-windows"
-	include "org.lwjgl:lwjgl-xxhash::natives-windows-x86"
-	include "org.lwjgl:lwjgl-lz4::natives-linux"
-	include "org.lwjgl:lwjgl-lz4::natives-macos"
-	include "org.lwjgl:lwjgl-lz4::natives-windows"
-	include "org.lwjgl:lwjgl-lz4::natives-windows-x86"
+	compileOnly "org.lwjgl:lwjgl-rpmalloc:${project.lwjgl_version}"
+	compileOnly "org.lwjgl:lwjgl-xxhash:${project.lwjgl_version}"
+	compileOnly "org.lwjgl:lwjgl-lz4:${project.lwjgl_version}"
+//	runtimeOnly "org.lwjgl:lwjgl-rpmalloc::$lwjglNatives"
+//	runtimeOnly "org.lwjgl:lwjgl-xxhash::$lwjglNatives"
+//	runtimeOnly "org.lwjgl:lwjgl-lz4::$lwjglNatives"
 
 	//modImplementation "io.github.prospector:modmenu:${project.modmenu_version}"
 }
