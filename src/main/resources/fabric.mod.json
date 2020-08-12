@@ -9,9 +9,9 @@
     "gudenau"
   ],
   "contact": {
-    "homepage": "",
-    "issues": "",
-    "sources": ""
+    "homepage": "https://github.com/gudenau/minecraft-gudfps",
+    "issues": "https://github.com/gudenau/minecraft-gudfps/issues",
+    "sources": "https://github.com/gudenau/minecraft-gudfps"
   },
 
   "license": "",
