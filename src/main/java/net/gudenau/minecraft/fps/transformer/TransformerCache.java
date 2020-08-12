@@ -11,11 +11,20 @@ import java.nio.MappedByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.ModContainer;
+import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.gudenau.minecraft.fps.GudFPS;
 import net.gudenau.minecraft.fps.fixes.RPMallocFixes;
 import net.gudenau.minecraft.fps.util.LockUtils;
@@ -28,12 +37,47 @@ public class TransformerCache{
     private static boolean enabled;
     private static volatile boolean loaded = false;
     
-    private static final long SEED = 0xCAFEBABEDEADBEEFL;
-    private static final Path CACHE_PATH = Paths.get("./gud_fps/cache");
+    private static final long SEED = calculateSeed();
     
+    private static final Path CACHE_PATH = Paths.get("./gud_fps/cache");
     private static volatile Long2ObjectMap<ByteBuffer> cache;
     private static final ReentrantReadWriteLock cacheLock = new ReentrantReadWriteLock();
+    
     private static Stats stats;
+    
+    private static long calculateSeed(){
+        if(GudFPS.CONFIG.enableCache.get()){
+            long seed = 0xCAFEBABEDEADBEEFL;
+            List<ModContainer> mods = new LinkedList<>(FabricLoader.getInstance().getAllMods());
+            mods.sort(Comparator.comparing(m->m.getMetadata().getId()));
+    
+            MessageDigest digest;
+            try{
+                digest = MessageDigest.getInstance("SHA-1");
+            }catch(NoSuchAlgorithmException e){
+                // Spec says this can't happen.....
+                System.err.println("JVM violates the MessageDigest spec.");
+                e.printStackTrace();
+                System.exit(0);
+                return -1; // Make javac happy.
+            }
+            
+            for(int i = 0; i < mods.size(); i++){
+                ModMetadata meta = mods.get(i).getMetadata();
+                digest.update((byte)i);
+                digest.update(meta.getId().getBytes(StandardCharsets.UTF_8));
+                digest.update((byte)~i);
+                digest.update(meta.getVersion().getFriendlyString().getBytes(StandardCharsets.UTF_8));
+            }
+            
+            byte[] result = digest.digest();
+            for(int i = 0; i < result.length; i++){
+                seed ^= (((long)result[i]) & 0xFF) << ((i & 7) << 3);
+            }
+            return seed;
+        }
+        return -1;
+    }
     
     public static void load(){
         enabled = GudFPS.CONFIG.enableCache.get();

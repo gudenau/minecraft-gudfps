@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -31,13 +32,19 @@ public class Transformers{
     
     static {
         GudFPS.Config config = GudFPS.CONFIG;
+        boolean devel = false;
+        try{
+            devel = Files.isDirectory(Paths.get(Transformers.class.getProtectionDomain().getCodeSource().getLocation().toURI()));
+        }catch(URISyntaxException ignored){}
         //TODO https://discordapp.com/channels/507304429255393322/556200510592647168/683490818077884493
         //TODO funroll
         config.removeForEach.doIf(true, ()->register(new ForEachRemover()));
         config.precomputeConstants.doIf(true, ()->register(new ConstantPrecomputer()));
-        config.removeBlockPos.doIf(true, ()->register(new BlockPosRemover()));
-        config.rpmalloc.doIf(true, ()->register(new RPmallocTransformer()));
         config.optimizeMath.doIf(true, ()->register(new MathOptimizer()));
+        if(devel){
+            config.removeBlockPos.doIf(true, ()->register(new BlockPosRemover()));
+            config.rpmalloc.doIf(true, ()->register(new RPmallocTransformer()));
+        }
     }
     
     private static void register(Transformer transformer){

@@ -6,24 +6,89 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.lang.reflect.Field;
+import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+import net.gudenau.minecraft.fps.util.Stats;
+import net.minecraft.block.Block;
 
 public class GudFPS implements ModInitializer{
     public static final Config CONFIG = loadConfig();
     
+    private final Stats stats = Stats.getStats("Force Loader");
+    
     @Override
     public void onInitialize(){
         System.err.println("Things will break, GudFPS is not meant to be 100% stable. :3");
+        
+        if(CONFIG.forceLoadClasses.get()){
+            System.err.println("Force loading Minecraft classes, this might take a moment...");
+            try{
+                Path path = Paths.get(Block.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+                if(Files.isDirectory(path)){
+                    forceLoadDir(path);
+                }else{
+                    forceLoadJar(path);
+                }
+            }catch(IOException | URISyntaxException ignored){
+                System.err.println("Failed to force load classes");
+            }
+        }
+    }
+    
+    private void forceLoadDir(Path path) throws IOException{
+        forceLoadDir(path, path);
+    }
+    
+    private void forceLoadDir(Path root, Path current) throws IOException{
+        if(Files.isDirectory(current)){
+            Iterator<Path> iterator = Files.list(root).iterator();
+            while(iterator.hasNext()){
+                forceLoadDir(root, iterator.next());
+            }
+        }else{
+            if(current.getFileName().endsWith(".class")){
+                current = root.relativize(current);
+                tryLoad(current.toString());
+            }
+        }
+    }
+    
+    private void forceLoadJar(Path path) throws IOException{
+        try(JarFile jar = new JarFile(path.toFile())){
+            Enumeration<JarEntry> iterator = jar.entries();
+            while(iterator.hasMoreElements()){
+                JarEntry entry = iterator.nextElement();
+                String name = entry.getName();
+                if(!entry.isDirectory() && name.endsWith(".class")){
+                    tryLoad(name);
+                }
+            }
+        }
+    }
+
+    private static final ClassLoader classLoader = GudFPS.class.getClassLoader();
+    private void tryLoad(String className){
+        try{
+            classLoader.loadClass(className.substring(0, className.length() - 6).replaceAll("/", "."));
+            stats.incrementStat("loaded");
+        }catch(ClassNotFoundException ignored){
+            stats.incrementStat("failed");
+        }
     }
     
     private static Config loadConfig(){
@@ -79,6 +144,7 @@ public class GudFPS implements ModInitializer{
         public final Option<Boolean> dump = new BooleanOption("dump", false);
         public final Option<Boolean> forceDump = new BooleanOption("forceDump", false);
         public final Option<Boolean> verify = new BooleanOption("verify", false);
+        public final Option<Boolean> forceLoadClasses = new BooleanOption("forceLoadClasses", true);
     
         private Config(Map<String, String> options){
             try{
