@@ -56,6 +56,7 @@ public class Plugin implements IMixinConfigPlugin{
         }
         
         ClassLoader classLoader = Plugin.class.getClassLoader();
+        Transformers.setClassLoader(classLoader);
     
         try{
             // Get all of the non-public classes

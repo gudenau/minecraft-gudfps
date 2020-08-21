@@ -30,6 +30,7 @@ public class Transformers{
     private static final boolean verifyClasses = GudFPS.CONFIG.verify.get();
     private static final Stats transformerStats = Stats.getStats("Transformer");
     private static final Stats dumperStats = Stats.getStats("Dump");
+    private static ClassLoader classLoader;
     
     static {
         GudFPS.Config config = GudFPS.CONFIG;
@@ -100,7 +101,12 @@ public class Transformers{
             transformerStats.incrementStat(transformer.getClass().getSimpleName());
         }
         
-        ClassWriter classWriter = new ClassWriter(flags.getFlags());
+        ClassWriter classWriter = new ClassWriter(flags.getFlags()){
+            @Override
+            protected ClassLoader getClassLoader(){
+                return classLoader;
+            }
+        };
         classNode.accept(classWriter);
         byte[] newClass = classWriter.toByteArray();
         if(dumpClasses){
@@ -159,5 +165,9 @@ public class Transformers{
                 e.printStackTrace();
             }
         });
+    }
+    
+    public static void setClassLoader(ClassLoader classLoader){
+        Transformers.classLoader = classLoader;
     }
 }
