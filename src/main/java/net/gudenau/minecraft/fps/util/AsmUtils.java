@@ -11,15 +11,7 @@ import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.LabelNode;
-import org.objectweb.asm.tree.LdcInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.TypeInsnNode;
+import org.objectweb.asm.tree.*;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -107,18 +99,18 @@ public class AsmUtils{
         return nodes;
     }
     
-    /*
-    NEW java/lang/RuntimeException
-    DUP
-    ALOAD 1
-    INVOKESPECIAL java/lang/RuntimeException.<init> (Ljava/lang/String;)V
-    ATHROW
-     */
-    public static InsnList throwException(String name, String method){
+    public static InsnList throwException(Class<? extends Throwable> type, String message){
+        return throwException(
+            Type.getInternalName(type),
+            message
+        );
+    }
+    
+    public static InsnList throwException(String name, String message){
         InsnList instructions = new InsnList();
         instructions.add(new TypeInsnNode(NEW, name));
         instructions.add(new InsnNode(DUP));
-        instructions.add(new LdcInsnNode(method));
+        instructions.add(new LdcInsnNode(message));
         instructions.add(new MethodInsnNode(INVOKESPECIAL, name, "<init>", "(Ljava/lang/String;)V", false));
         instructions.add(new InsnNode(ATHROW));
         return instructions;
@@ -391,5 +383,51 @@ public class AsmUtils{
                 handle.getTag()
             ));
         }
+    }
+    
+    @SuppressWarnings("unchecked")
+    public static <T extends AbstractInsnNode> T findInstruction(AbstractInsnNode start, Function<AbstractInsnNode, Boolean> check){
+        AbstractInsnNode node = start;
+        while(node != null){
+            if(check.apply(node)){
+                return (T)node;
+            }
+            node = node.getNext();
+        }
+        return null;
+    }
+    
+    public static boolean hasAnnotation(ClassNode klass, String annotation){
+        return getAnnotation(klass.invisibleAnnotations, klass.visibleAnnotations, annotation) != null;
+    }
+    
+    public static boolean hasAnnotation(MethodNode method, String annotation){
+        return getAnnotation(method.invisibleAnnotations, method.visibleAnnotations, annotation) != null;
+    }
+    
+    public static AnnotationNode getAnnotation(ClassNode klass, String annotation){
+        return getAnnotation(klass.invisibleAnnotations, klass.visibleAnnotations, annotation);
+    }
+    
+    public static AnnotationNode getAnnotation(MethodNode method, String annotation){
+        return getAnnotation(method.invisibleAnnotations, method.visibleAnnotations, annotation);
+    }
+    
+    public static AnnotationNode getAnnotation(List<AnnotationNode> invisibleAnnotations, List<AnnotationNode> visibleAnnotations, String annotation){
+        if(invisibleAnnotations != null && !invisibleAnnotations.isEmpty()){
+            for(AnnotationNode node : invisibleAnnotations){
+                if(node.desc.equals(annotation)){
+                    return node;
+                }
+            }
+        }
+        if(visibleAnnotations != null && !visibleAnnotations.isEmpty()){
+            for(AnnotationNode node : visibleAnnotations){
+                if(node.desc.equals(annotation)){
+                    return node;
+                }
+            }
+        }
+        return null;
     }
 }

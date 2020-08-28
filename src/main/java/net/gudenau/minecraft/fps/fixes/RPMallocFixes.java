@@ -1,6 +1,6 @@
 package net.gudenau.minecraft.fps.fixes;
 
-import net.gudenau.minecraft.fps.util.AssemblyTarget;
+import net.gudenau.minecraft.fps.util.annotation.AssemblyTarget;
 import org.lwjgl.system.rpmalloc.RPmalloc;
 
 @AssemblyTarget

@@ -1,11 +1,11 @@
-package net.gudenau.minecraft.fps.util;
+package net.gudenau.minecraft.fps.util.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Retention(RetentionPolicy.SOURCE)
 @Target({ElementType.FIELD, ElementType.CONSTRUCTOR, ElementType.METHOD, ElementType.TYPE})
+@Retention(RetentionPolicy.SOURCE)
 public @interface AssemblyTarget{
 }

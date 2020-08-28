@@ -74,4 +74,12 @@ public class ReflectionHelper{
     public static <O, T extends O> MethodHandle findVirtual(Class<T> owner, O instance, String name, MethodType type) throws ReflectiveOperationException{
         return IMPL_LOOKUP.findVirtual(owner, name, type).bindTo(instance);
     }
+    
+    public static MethodHandle findStatic(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException{
+        return IMPL_LOOKUP.findStatic(
+            owner,
+            name,
+            MethodType.methodType(returnType, params)
+        );
+    }
 }

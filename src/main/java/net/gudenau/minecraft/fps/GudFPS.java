@@ -47,7 +47,6 @@ public class GudFPS implements ModInitializer{
             }catch(IOException | URISyntaxException ignored){
                 System.err.println("Failed to force load classes");
             }
-            System.exit(0);
         }
     }
     
@@ -146,6 +145,7 @@ public class GudFPS implements ModInitializer{
         public final Option<Boolean> forceDump = new BooleanOption("forceDump", false);
         public final Option<Boolean> verify = new BooleanOption("verify", false);
         public final Option<Boolean> forceLoadClasses = new BooleanOption("forceLoadClasses", true);
+        public final Option<Boolean> enableInline = new BooleanOption("enableInline", true);
     
         private Config(Map<String, String> options){
             try{
@@ -184,7 +184,8 @@ public class GudFPS implements ModInitializer{
                    Objects.equals(dump, config.dump) &&
                    Objects.equals(forceDump, config.forceDump) &&
                    Objects.equals(verify, config.verify) &&
-                   Objects.equals(optimizeMath, config.optimizeMath);
+                   Objects.equals(optimizeMath, config.optimizeMath) &&
+                   Objects.equals(enableInline, config.enableInline);
         }
     
         @Override
@@ -194,7 +195,8 @@ public class GudFPS implements ModInitializer{
                 (removeBlockPos.get() ? (1 << 1) : 0) |
                 (precomputeConstants.get() ? (1 << 2) : 0) |
                 (rpmalloc.get() ? (1 << 3) : 0) |
-                (optimizeMath.get() ? (1 << 4) : 0);
+                (optimizeMath.get() ? (1 << 4) : 0) |
+                (enableInline.get() ? (1 << 5) : 0);
         }
     }
     

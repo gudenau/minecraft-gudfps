@@ -27,3 +27,8 @@ bin/
 # fabric
 
 run/
+
+
+# Misc
+
+*.7z

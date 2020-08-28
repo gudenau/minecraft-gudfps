@@ -17,6 +17,7 @@ import net.gudenau.minecraft.fps.util.LibraryLoader;
 import net.gudenau.minecraft.fps.util.ReflectionHelper;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.rpmalloc.RPmalloc;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
@@ -117,6 +118,9 @@ public class Plugin implements IMixinConfigPlugin{
             "org.lwjgl.",
             "it.unimi.dsi.fastutil."
         ));
+        private static final Set<String> WHITELIST = new HashSet<>(Arrays.asList(
+            "net.gudenau.minecraft.fps.fixes."
+        ));
         
         public OurMixinTransformer(FabricMixinTransformerProxy parent){
             this.parent = parent;
@@ -126,12 +130,22 @@ public class Plugin implements IMixinConfigPlugin{
         public byte[] transformClassBytes(String name, String transformedName, byte[] basicClass){
             for(String blacklisted : BLACKLIST){
                 if(name.startsWith(blacklisted)){
-                    return parent.transformClassBytes(name, transformedName, basicClass);
+                    for(String whitelistd : WHITELIST){
+                        if(!name.startsWith(whitelistd)){
+                            return parent.transformClassBytes(name, transformedName, basicClass);
+                        }
+                    }
                 }
             }
             
             byte[] cachedClass = TransformerCache.getEntry(basicClass);
             if(cachedClass != null){
+                ClassNode node = new ClassNode();
+                new ClassReader(cachedClass).accept(node, 0);
+                if(Transformers.shouldForceBootstrap(node)){
+                    Transformers.forceBootstrap(node.name, cachedClass);
+                    return null;
+                }
                 return cachedClass;
             }
             byte[] mixinClass = parent.transformClassBytes(name, transformedName, basicClass);

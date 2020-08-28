@@ -11,7 +11,9 @@ import java.util.function.LongConsumer;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.StreamSupport;
-import net.gudenau.minecraft.fps.util.AssemblyTarget;
+import net.gudenau.minecraft.fps.util.annotation.AssemblyTarget;
+import net.gudenau.minecraft.fps.util.annotation.ForceBootloader;
+import net.gudenau.minecraft.fps.util.annotation.ForceInline;
 import net.minecraft.entity.Entity;
 import net.minecraft.util.BlockRotation;
 import net.minecraft.util.CuboidBlockIterator;
@@ -22,28 +24,26 @@ import net.minecraft.util.math.Position;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.util.math.Vec3i;
 
+@ForceBootloader
 @AssemblyTarget
 public class BlockPosFixes{
     private static final int BITS_X = 26;
-    private static final int BITS_Y = 11;
+    private static final int BITS_Y = 12;
     private static final int BITS_Z = 26;
-    private static final int BITS_I = 1;
     
     private static final long SHIFT_X = BITS_Y + BITS_Z;
     private static final long SHIFT_Y = 0;
     private static final long SHIFT_Z = BITS_Y;
-    private static final long SHIFT_I = BITS_Y + BITS_Z + BITS_Y;
     
     private static final long MASK_X = 0x03FFFFFF;
-    private static final long MASK_Y = 0x000007FF;
+    private static final long MASK_Y = 0x00000FFF;
     private static final long MASK_Z = 0x03FFFFFF;
-    private static final long MASK_I = 0x00000001;
     
-    @AssemblyTarget
-    public static boolean isImmutable(long value){
-        return ((value >>> SHIFT_I) & MASK_I) == 0;
-    }
+    private static final long SHIFT_MASK_X = MASK_X << SHIFT_X;
+    private static final long SHIFT_MASK_Y = MASK_Y << SHIFT_Y;
+    private static final long SHIFT_MASK_Z = MASK_Z << SHIFT_Z;
     
+    @ForceInline
     @AssemblyTarget
     public static long init(int x, int y, int z){
         return ((x & MASK_X) << SHIFT_X) |
@@ -51,46 +51,71 @@ public class BlockPosFixes{
                ((z & MASK_Z) << SHIFT_Z);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long init(double x, double y, double z) {
-        return init(MathHelper.floor(x), MathHelper.floor(y), MathHelper.floor(z));
+    public static long init(double x, double y, double z){
+        return init(
+            MathHelper.floor(x),
+            MathHelper.floor(y),
+            MathHelper.floor(z)
+        );
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long init(Entity entity){
-        return init(entity.getX(), entity.getY(), entity.getZ());
+        return init(
+            entity.getX(),
+            entity.getY(),
+            entity.getZ()
+        );
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long init(Vec3d value){
-        return init(value.getX(), value.getY(), value.getZ());
+        return init(
+            value.getX(),
+            value.getY(),
+            value.getZ()
+        );
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long init(Position pos){
-        return init(pos.getX(), pos.getY(), pos.getZ());
+        return init(
+            pos.getX(),
+            pos.getY(),
+            pos.getZ()
+        );
+    }
+    
+    @ForceInline
+    @AssemblyTarget
+    public static long init(Vec3i pos){
+        return init(
+            pos.getX(),
+            pos.getY(),
+            pos.getZ()
+        );
     }
     
     @AssemblyTarget
-    public static long init(Vec3i pos) {
-        return init(pos.getX(), pos.getY(), pos.getZ());
-    }
-    
-    @AssemblyTarget
-    public static <T> long deserialize(Dynamic<T> dynamic) {
+    public static <T> long deserialize(Dynamic<T> dynamic){
         Spliterator.OfInt ofInt = dynamic.asIntStream().spliterator();
         int[] is = new int[3];
         if(
             ofInt.tryAdvance((IntConsumer)(i)->is[0] = i) &&
             ofInt.tryAdvance((IntConsumer)(i)->is[1] = i)
-        ) {
+        ){
             ofInt.tryAdvance((IntConsumer)(i)->is[2] = i);
         }
         return init(is[0], is[1], is[2]);
     }
     
     @AssemblyTarget
-    public static <T> T serialize(long value, DynamicOps<T> ops) {
+    public static <T> T serialize(long value, DynamicOps<T> ops){
         return ops.createIntList(IntStream.of(
             unpackLongX(value),
             unpackLongY(value),
@@ -98,123 +123,164 @@ public class BlockPosFixes{
         ));
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long add(long value, int x, int y, int z) {
-        return asLong(unpackLongX(value) + x, unpackLongY(value) + y, unpackLongZ(value) + z);
+    public static long add(long value, int x, int y, int z){
+        return
+            ((value + ((long)x << SHIFT_X)) & SHIFT_MASK_X) |
+            ((value + ((long)y << SHIFT_Y)) & SHIFT_MASK_Y) |
+            ((value + ((long)z << SHIFT_Z)) & SHIFT_MASK_Z);
     }
     
+    @ForceInline
     @AssemblyTarget
     public static int unpackLongX(long x){
         return (int)((x >>> SHIFT_X) & MASK_X);
     }
     
+    @ForceInline
     @AssemblyTarget
     public static int unpackLongY(long y){
         return (int)((y >>> SHIFT_Y) & MASK_Y);
     }
     
+    @ForceInline
     @AssemblyTarget
     public static int unpackLongZ(long z){
         return (int)((z >>> SHIFT_Z) & MASK_Z);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long fromLong(long value) {
+    public static long fromLong(long value){
         return value;
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long asLong(int x, int y, int z) {
+    public static long asLong(int x, int y, int z){
         return init(x, y, z);
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long removeChunkSectionLocalY(long y){
-        return y & -16L;
+        return y & ~0xFL;
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long asLong(long value){
         return value;
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long add(long value, double x, double y, double z){
-        return init(unpackLongX(value) + x, unpackLongY(value) + y, unpackLongZ(value) + z);
+        return init(
+            unpackLongX(value) + x,
+            unpackLongY(value) + y,
+            unpackLongZ(value) + z
+        );
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long add(long value, Vec3i pos){
-        return add(value, pos.getX(), pos.getY(), pos.getZ());
+        return add(
+            value,
+            pos.getX(),
+            pos.getY(),
+            pos.getZ()
+        );
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long subtract(long value, Vec3i pos){
-        return add(value, -pos.getX(), -pos.getY(), -pos.getZ());
+        return add(
+            value,
+            -pos.getX(),
+            -pos.getY(),
+            -pos.getZ()
+        );
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long up(long value){
-        return offset(value, Direction.UP);
+        return add(value, 0, 1, 0);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long up(long value, int distance) {
-        return offset(value, Direction.UP, distance);
+    public static long up(long value, int distance){
+        return add(value, 0, distance, 0);
     }
     
+    @ForceInline
     @AssemblyTarget
     public static long down(long value){
-        return offset(value, Direction.DOWN);
+        return add(value, 0, -1, 0);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long down(long value, int distance) {
-        return offset(value, Direction.DOWN, distance);
+    public static long down(long value, int distance){
+        return add(value, 0, -distance, 0);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long north(long value) {
-        return offset(value, Direction.NORTH);
+    public static long north(long value){
+        return add(value, 0, 0, -1);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long north(long value, int distance) {
-        return offset(value, Direction.NORTH, distance);
+    public static long north(long value, int distance){
+        return add(value, 0, 0, -distance);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long south(long value) {
-        return offset(value, Direction.SOUTH);
+    public static long south(long value){
+        return add(value, 0, 0, 1);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long south(long value, int distance) {
-        return offset(value, Direction.SOUTH, distance);
+    public static long south(long value, int distance){
+        return add(value, 0, 0, -distance);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long west(long value) {
-        return offset(value, Direction.WEST);
+    public static long west(long value){
+        return add(value, -1, 0, 0);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long west(long value, int distance) {
-        return offset(value, Direction.WEST, distance);
+    public static long west(long value, int distance){
+        return add(value, -distance, 0, 0);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long east(long value) {
-        return offset(value, Direction.EAST);
+    public static long east(long value){
+        return add(value, 1, 0, 0);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long east(long value, int distance) {
-        return offset(value, Direction.EAST, distance);
+    public static long east(long value, int distance){
+        return add(value, distance, 0, 0);
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long offset(long value, Direction direction) {
+    public static long offset(long value, Direction direction){
         return init(
             unpackLongX(value) + direction.getOffsetX(),
             unpackLongY(value) + direction.getOffsetY(),
@@ -222,8 +288,9 @@ public class BlockPosFixes{
         );
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long offset(long value, Direction direction, int amount) {
+    public static long offset(long value, Direction direction, int amount){
         return amount == 0 ? value : init(
             unpackLongX(value) + direction.getOffsetX() * amount,
             unpackLongY(value) + direction.getOffsetY() * amount,
@@ -232,8 +299,8 @@ public class BlockPosFixes{
     }
     
     @AssemblyTarget
-    public static long rotate(long value, BlockRotation rotation) {
-        switch(rotation) {
+    public static long rotate(long value, BlockRotation rotation){
+        switch(rotation){
             case NONE:
             default:
                 return value;
@@ -246,8 +313,9 @@ public class BlockPosFixes{
         }
     }
     
+    @ForceInline
     @AssemblyTarget
-    public static long crossProduct(long value, Vec3i pos) {
+    public static long crossProduct(long value, Vec3i pos){
         return init(
             unpackLongY(value) * pos.getZ() - unpackLongZ(value) * pos.getY(),
             unpackLongZ(value) * pos.getX() - unpackLongX(value) * pos.getZ(),
@@ -255,14 +323,14 @@ public class BlockPosFixes{
         );
     }
     
-    //FIXME
+    @ForceInline
     @AssemblyTarget
     public static long toImmutable(long value){
         return value;
     }
     
     @AssemblyTarget
-    public static LongIterable iterate(long pos1, long pos2) {
+    public static LongIterable iterate(long pos1, long pos2){
         return iterate(
             Math.min(unpackLongX(pos1), unpackLongX(pos2)),
             Math.min(unpackLongY(pos1), unpackLongY(pos2)),
@@ -274,7 +342,7 @@ public class BlockPosFixes{
     }
     
     @AssemblyTarget
-    public static LongStream stream(long pos1, long pos2) {
+    public static LongStream stream(long pos1, long pos2){
         return stream(
             Math.min(unpackLongX(pos1), unpackLongX(pos2)),
             Math.min(unpackLongY(pos1), unpackLongY(pos2)),
@@ -286,7 +354,7 @@ public class BlockPosFixes{
     }
     
     @AssemblyTarget
-    public static LongStream method_23627(BlockBox blockBox) {
+    public static LongStream method_23627(BlockBox blockBox){
         return stream(
             Math.min(blockBox.minX, blockBox.maxX),
             Math.min(blockBox.minY, blockBox.maxY),
