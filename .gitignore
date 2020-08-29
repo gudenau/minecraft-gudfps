@@ -32,3 +32,5 @@ run/
 # Misc
 
 *.7z
+src/main/java/net/gudenau/minecraft/fps/util/EasterEgger.java
+/src/main/resources/assets/gud_fps/eggs/

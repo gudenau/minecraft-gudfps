@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +27,9 @@ import org.spongepowered.asm.mixin.transformer.FabricMixinTransformerProxy;
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
 
 public class Plugin implements IMixinConfigPlugin{
+    private static final IMixinTransformer originalTransformer;
+    private static final MethodHandle EasterEgger$getMixins;
+    
     static{
         if(!System.getProperty("os.arch").contains("64")){
             System.err.printf(
@@ -74,7 +78,7 @@ public class Plugin implements IMixinConfigPlugin{
     
             // Get the original env transformer
             MethodHandle MixinEnvironment$transformer$getter = ReflectionHelper.findStaticGetter(MixinEnvironment.class, "transformer", IMixinTransformer.class);
-            IMixinTransformer originalTransformer = (IMixinTransformer)MixinEnvironment$transformer$getter.invoke();
+            originalTransformer = (IMixinTransformer)MixinEnvironment$transformer$getter.invoke();
             
             // Clear it out
             MethodHandle MixinEnvironment$transformer$setter = ReflectionHelper.findStaticSetter(MixinEnvironment.class, "transformer", IMixinTransformer.class);
@@ -92,6 +96,26 @@ public class Plugin implements IMixinConfigPlugin{
         }catch(Throwable e){
             throw new RuntimeException("Failed to hook into class loading", e);
         }
+        
+        MethodHandle getMixins;
+        try{
+            Class<?> EasterEgger = classLoader.loadClass("net.gudenau.minecraft.fps.util.EasterEgger");
+            ReflectionHelper.findStatic(
+                EasterEgger,
+                "init",
+                void.class
+            ).invokeExact();
+            getMixins = ReflectionHelper.findStatic(
+                EasterEgger,
+                "getMixins",
+                List.class,
+                IMixinTransformer.class
+            );
+        }catch(Throwable ignored){
+            // Not a gud build, just ignore it.
+            getMixins = null;
+        }
+        EasterEgger$getMixins = getMixins;
     }
     
     private static void delete(Path path) throws IOException{
@@ -171,9 +195,14 @@ public class Plugin implements IMixinConfigPlugin{
     @Override
     public void acceptTargets(Set<String> myTargets, Set<String> otherTargets){}
     
+    @SuppressWarnings("unchecked")
     @Override
     public List<String> getMixins(){
-        return null;
+        try{
+            return EasterEgger$getMixins == null ? Collections.emptyList() : (List<String>)EasterEgger$getMixins.invokeExact(originalTransformer);
+        }catch(Throwable throwable){
+            return Collections.emptyList();
+        }
     }
     
     @Override

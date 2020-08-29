@@ -30,6 +30,27 @@ public class ArrayUtils{
         }
         return result;
     }
+    /**
+     * Combines a bunch of arrays into a single array.
+     *
+     * @param arrays The arrays to combine
+     *
+     * @return The combined array
+     * */
+    public static byte[] combine(byte[]... arrays){
+        int totalSize = 0;
+        for(byte[] array : arrays){
+            totalSize += array.length;
+        }
+        byte[] result = new byte[totalSize];
+        int offset = 0;
+        for(byte[] array : arrays){
+            int length = array.length;
+            System.arraycopy(array, 0, result, offset, length);
+            offset += length;
+        }
+        return result;
+    }
     
     /**
      * Checks if a value is inside an array.
