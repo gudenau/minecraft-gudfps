@@ -3,20 +3,22 @@ package net.gudenau.minecraft.fps.util;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 
+@SuppressWarnings({"SameParameterValue", "unused", "RedundantSuppression"})
 public class ReflectionHelper{
-    private static final MethodHandles.Lookup IMPL_LOOKUP;
+    private static final long AccessibleObject$override = findOverride();
     
-    static{
-        IMPL_LOOKUP = forceGetField(
-            MethodHandles.Lookup.class,
-            null,
-            Modifier.STATIC | Modifier.FINAL,
-            MethodHandles.Lookup.class
-        );
-    }
+    private static final MethodHandles.Lookup IMPL_LOOKUP = forceGetField(
+        MethodHandles.Lookup.class,
+        null,
+        Modifier.STATIC | Modifier.FINAL,
+        MethodHandles.Lookup.class
+    );
     
     @SuppressWarnings("unchecked")
     private static <O, T> T forceGetField(Class<O> owner, O instance, int mods, Class<T> type){
@@ -26,7 +28,7 @@ public class ReflectionHelper{
                 field.getType() == type
             ){
                 try{
-                    field.setAccessible(true);
+                    forceSetAccessible(field, true);
                     return (T)field.get(instance);
                 }catch(ReflectiveOperationException ignored){}
             }
@@ -36,6 +38,27 @@ public class ReflectionHelper{
             owner.getName(),
             type.getName()
         ));
+    }
+    
+    @SuppressWarnings("deprecation")
+    private static long findOverride(){
+        AccessibleObject object = UnsafeHelper.allocateInstance(AccessibleObject.class);
+        for(long cookie = 0; cookie < 64; cookie += 4){
+            int original = UnsafeHelper.getInt(object, cookie);
+            object.setAccessible(true);
+            if(original != UnsafeHelper.getInt(object, cookie)){
+                UnsafeHelper.putInt(object, cookie, original);
+                if(!object.isAccessible()){
+                    return cookie;
+                }
+            }
+            object.setAccessible(false);
+        }
+        return -1;
+    }
+    
+    private static void forceSetAccessible(AccessibleObject object, boolean accessible){
+        UnsafeHelper.putInt(object, AccessibleObject$override, accessible ? 1 : 0);
     }
     
     public static MethodHandle findGetter(Class<?> owner, String name, Class<?> type) throws ReflectiveOperationException{
@@ -81,5 +104,94 @@ public class ReflectionHelper{
             name,
             MethodType.methodType(returnType, params)
         );
+    }
+    
+    private static final class UnsafeHelper{
+        private static final Class<?> Unsafe = loadUnsafe();
+        private static final Object theUnsafe = getUnsafe();
+        
+        private static Class<?> loadUnsafe(){
+            try{
+                return loadClass("sun.misc.Unsafe");
+            }catch(ReflectiveOperationException e2){
+                System.err.println("Failed to load Unsafe class");
+                e2.printStackTrace();
+                System.exit(0);
+                return null;
+            }
+        }
+        
+        private static Object getUnsafe(){
+            final int modifiers = Modifier.PRIVATE | Modifier.STATIC | Modifier.FINAL;
+            for(Field field : Unsafe.getDeclaredFields()){
+                if(field.getModifiers() == modifiers && field.getType() == Unsafe){
+                    try{
+                        field.setAccessible(true);
+                        Object unsafe = field.get(null);
+                        if(unsafe != null){
+                            return unsafe;
+                        }
+                    }catch(ReflectiveOperationException ignored){}
+                }
+            }
+            System.err.println("Failed to find Unsafe instance");
+            System.exit(0);
+            return null;
+        }
+        
+        private static MethodHandle findMethod(String name, Class<?>... arguments){
+            for(Method method : Unsafe.getDeclaredMethods()){
+                if(
+                    method.getName().equals(name) &&
+                    Arrays.equals(arguments, method.getParameterTypes())
+                ){
+                    try{
+                        method.setAccessible(true);
+                        MethodHandle handle = MethodHandles.lookup().unreflect(method);
+                        return handle.bindTo(theUnsafe);
+                    }catch(ReflectiveOperationException ignored){}
+                }
+            }
+            
+            System.err.println("Failed to find Unsafe." + name);
+            System.exit(0);
+            return null;
+        }
+        
+        private static final MethodHandle allocateInstance = findMethod("allocateInstance", Class.class);
+        @SuppressWarnings("unchecked")
+        static <T> T allocateInstance(Class<T> type){
+            try{
+                return (T)((Object)allocateInstance.invokeExact(type));
+            }catch(Throwable throwable){
+                System.err.println("Failed to allocate " + type.getName());
+                throwable.printStackTrace();
+                System.exit(0);
+                return null;
+            }
+        }
+    
+        private static final MethodHandle putInt = findMethod("putInt", Object.class, long.class, int.class);
+        static void putInt(Object o, long offset, int x){
+            try{
+                putInt.invokeExact(o, offset, x);
+            }catch(Throwable throwable){
+                System.err.println("Failed to put int");
+                throwable.printStackTrace();
+                System.exit(0);
+            }
+        }
+        
+        private static final MethodHandle getInt = findMethod("getInt", Object.class, long.class);
+        static int getInt(Object o, long offset){
+            try{
+                return (int)getInt.invokeExact(o, offset);
+            }catch(Throwable throwable){
+                System.err.println("Failed to get int");
+                throwable.printStackTrace();
+                System.exit(0);
+                return -1;
+            }
+        }
     }
 }
