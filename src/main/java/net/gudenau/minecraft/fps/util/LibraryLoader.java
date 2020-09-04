@@ -3,7 +3,8 @@ package net.gudenau.minecraft.fps.util;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Field;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URL;
@@ -12,10 +13,15 @@ import java.nio.channels.Channels;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarInputStream;
+import java.util.zip.ZipEntry;
 import org.lwjgl.system.Platform;
 
 public class LibraryLoader{
@@ -66,39 +72,35 @@ public class LibraryLoader{
         }
     
         try{
-            // Get fields
-            Field delegate = KnotClassLoader.getDeclaredField("delegate");
-            Field urlLoader = KnotClassLoader.getDeclaredField("urlLoader");
+            // Get non-accessible types
+            Class<?> KnotClassDelegate = ReflectionHelper.loadClass("net.fabricmc.loader.launch.knot.KnotClassDelegate");
+            Class<?> DynamicURLClassLoader = ReflectionHelper.loadClass("net.fabricmc.loader.launch.knot.KnotClassLoader$DynamicURLClassLoader");
             
-            // Make them accessible
-            delegate.setAccessible(true);
-            urlLoader.setAccessible(true);
-    
-            // Get the dynamic class loader
-            Class<?> DynamicURLClassLoader = urlLoader.getType();
+            // Get fields
+            MethodHandle delegate$getter = ReflectionHelper.findGetter(KnotClassLoader, classLoader, "delegate", KnotClassDelegate);
+            MethodHandle urlLoader$getter = ReflectionHelper.findGetter(KnotClassLoader, classLoader, "urlLoader", DynamicURLClassLoader);
+            MethodHandle metadataCacheField$getter = ReflectionHelper.findGetter(KnotClassDelegate, "metadataCache", Map.class);
             
             // Add the URLs
-            Method addURL = DynamicURLClassLoader.getDeclaredMethod("addURL", URL.class);
-            addURL.setAccessible(true);
-            Object dynamicClassLoader = urlLoader.get(classLoader);
+            Object dynamicClassLoader = urlLoader$getter.invoke();
+            MethodHandle addURL = ReflectionHelper.unreflect(DynamicURLClassLoader.getDeclaredMethod("addURL", URL.class)).bindTo(dynamicClassLoader);
+            //MethodHandle addURL = ReflectionHelper.findVirtual(DynamicURLClassLoader, dynamicClassLoader, "addUrl", MethodType.methodType(void.class, URL.class));
             
             Set<URL> urls = new HashSet<>(); // Save for later
             for(Path path : paths){
                 URL url = path.toUri().toURL();
                 urls.add(url);
-                addURL.invoke(dynamicClassLoader, url);
+                addURL.invoke(url);
             }
             
             // The following hacks fix a CME
             // Get the delegate
-            Object knotDelegate = delegate.get(classLoader);
+            Object knotDelegate = delegate$getter.invoke();
+            metadataCacheField$getter = metadataCacheField$getter.bindTo(knotDelegate);
             
             // Cache the metadata
-            Class<?> KnotClassDelegate = knotDelegate.getClass();
-            Field metadataCacheField = KnotClassDelegate.getDeclaredField("metadataCache");
-            metadataCacheField.setAccessible(true);
             @SuppressWarnings("unchecked")
-            Map<String, Object> metadataCache = (Map<String, Object>)metadataCacheField.get(knotDelegate);
+            Map<String, Object> metadataCache = (Map<String, Object>)metadataCacheField$getter.invoke();
     
             // Find the lambda.
             //   private static synthetic lambda$getMetadata$0(Ljava/lang/String;)Lnet/fabricmc/loader/launch/knot/KnotClassDelegate$Metadata;
@@ -106,30 +108,36 @@ public class LibraryLoader{
             Class<?>[] params = new Class[]{
                 String.class
             };
-            Method apply = null;
+            
+            Method applyMethod = null;
             for(Method method : KnotClassDelegate.getDeclaredMethods()){
                 //noinspection MagicConstant
                 if(
                     method.getModifiers() == modifiers &&
                     Arrays.equals(method.getParameterTypes(), params)
                 ){
-                    apply = method;
+                    applyMethod = method;
                     method.setAccessible(true);
                     break;
                 }
             }
             
-            if(apply == null){
+            if(applyMethod == null){
                 RuntimeException exception = new RuntimeException("Failed to find lambda");
                 exception.printStackTrace();
                 System.exit(0);
                 throw exception;
             }
             
+            MethodHandle apply = ReflectionHelper.unreflect(applyMethod);
+            
             for(URL url : urls){
-                metadataCache.put(url.toString(), apply.invoke(null, url.toString()));
+                metadataCache.put(url.toString(), apply.invoke(url.toString()));
             }
-        }catch(ReflectiveOperationException e){
+            
+            // Fixes a really weird issue in the cache
+            classLoader.loadClass("org.lwjgl.util.xxhash.LibXXHash");
+        }catch(Throwable e){
             System.err.println("Failed to modify path");
             e.printStackTrace();
             System.exit(0);

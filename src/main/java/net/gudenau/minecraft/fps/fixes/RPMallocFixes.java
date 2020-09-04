@@ -1,8 +1,11 @@
 package net.gudenau.minecraft.fps.fixes;
 
 import net.gudenau.minecraft.fps.util.annotation.AssemblyTarget;
+import net.gudenau.minecraft.asm.api.v0.annotation.ForceBootloader;
+import net.gudenau.minecraft.asm.api.v0.annotation.ForceInline;
 import org.lwjgl.system.rpmalloc.RPmalloc;
 
+@ForceBootloader
 @AssemblyTarget
 public class RPMallocFixes{
     @AssemblyTarget
@@ -17,11 +20,13 @@ public class RPMallocFixes{
         };
     }
     
+    @ForceInline
     @AssemblyTarget
     public static void threadStart(){
         RPmalloc.rpmalloc_thread_initialize();
     }
     
+    @ForceInline
     @AssemblyTarget
     public static void threadEnd(){
         RPmalloc.rpmalloc_thread_finalize();

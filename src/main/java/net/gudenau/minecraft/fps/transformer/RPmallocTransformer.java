@@ -2,6 +2,8 @@ package net.gudenau.minecraft.fps.transformer;
 
 import java.util.HashSet;
 import java.util.Set;
+import net.gudenau.minecraft.asm.api.v0.Identifier;
+import net.gudenau.minecraft.asm.api.v0.Transformer;
 import net.gudenau.minecraft.fps.util.AsmUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -15,6 +17,16 @@ import static org.objectweb.asm.Opcodes.*;
 
 public class RPmallocTransformer implements Transformer{
     private final Stats stats = Stats.getStats("RPmalloc");
+    
+    @Override
+    public Identifier getName(){
+        return new Identifier("gud_fps", "rpmalloc_transformer");
+    }
+    
+    @Override
+    public boolean handlesClass(String name, String transformedName){
+        return true;
+    }
     
     @Override
     public boolean transform(ClassNode classNode, Flags flags){

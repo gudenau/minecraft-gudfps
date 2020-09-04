@@ -1,6 +1,8 @@
 package net.gudenau.minecraft.fps.transformer;
 
 import java.util.Set;
+import net.gudenau.minecraft.asm.api.v0.Identifier;
+import net.gudenau.minecraft.asm.api.v0.Transformer;
 import net.gudenau.minecraft.fps.util.ArrayUtils;
 import net.gudenau.minecraft.fps.util.AsmUtils;
 import net.gudenau.minecraft.fps.util.Stats;
@@ -34,6 +36,16 @@ public class MathOptimizer implements Transformer{
     };
     
     private final Stats stats = Stats.getStats("Math Optimizer");
+    
+    @Override
+    public Identifier getName(){
+        return new Identifier("gud_asm", "math_optimizer");
+    }
+    
+    @Override
+    public boolean handlesClass(String name, String transformedName){
+        return true;
+    }
     
     @Override
     public boolean transform(ClassNode classNode, Flags flags){

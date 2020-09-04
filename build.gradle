@@ -25,7 +25,8 @@ switch (OperatingSystem.current()) {
 }
 
 repositories {
-	maven {url "http://tehnut.info/maven"}
+	//maven {url "http://tehnut.info/maven"}
+	maven {url "https://maven.dblsaiko.net"}
 }
 
 dependencies {
@@ -45,6 +46,8 @@ dependencies {
 //	runtimeOnly "org.lwjgl:lwjgl-rpmalloc::$lwjglNatives"
 //	runtimeOnly "org.lwjgl:lwjgl-xxhash::$lwjglNatives"
 //	runtimeOnly "org.lwjgl:lwjgl-lz4::$lwjglNatives"
+
+	modImplementation include("net.gudenau.minecraft:gudasm:${project.gudasm_version}")
 
 	//modImplementation "io.github.prospector:modmenu:${project.modmenu_version}"
 }

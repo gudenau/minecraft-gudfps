@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import net.gudenau.minecraft.asm.api.v0.Identifier;
+import net.gudenau.minecraft.asm.api.v0.Transformer;
 import net.gudenau.minecraft.fps.util.AsmUtils;
 import net.gudenau.minecraft.fps.util.LockUtils;
 import net.gudenau.minecraft.fps.util.Stats;
@@ -20,6 +22,16 @@ public class ForEachRemover implements Transformer{
     private static final ReentrantReadWriteLock INTERFACE_MAP_LOCK = new ReentrantReadWriteLock();
     
     private final Stats stats = Stats.getStats("forEach Remover");
+    
+    @Override
+    public Identifier getName(){
+        return new Identifier("gud_fps", "foreach_remover");
+    }
+    
+    @Override
+    public boolean handlesClass(String name, String transformedName){
+        return true;
+    }
     
     @Override
     public boolean transform(ClassNode classNode, Flags flags){

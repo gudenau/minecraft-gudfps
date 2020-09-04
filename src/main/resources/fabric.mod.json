@@ -21,6 +21,9 @@
   "entrypoints": {
     "main": [
       "net.gudenau.minecraft.fps.GudFPS"
+    ],
+    "gud_asm": [
+      "net.gudenau.minecraft.fps.GudFPSAsm"
     ]
   },
   "mixins": [
@@ -29,7 +32,8 @@
 
   "depends": {
     "fabricloader": ">=0.7.4",
-    "minecraft": "1.16.x"
+    "minecraft": "1.16.x",
+    "gud_asm": ">=0.0.2"
   },
   "suggests": {}
 }

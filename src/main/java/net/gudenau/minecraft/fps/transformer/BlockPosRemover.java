@@ -14,6 +14,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.MappingResolver;
+import net.gudenau.minecraft.asm.api.v0.Identifier;
+import net.gudenau.minecraft.asm.api.v0.Transformer;
 import net.gudenau.minecraft.fps.util.ArrayUtils;
 import net.gudenau.minecraft.fps.util.AsmUtils;
 import net.gudenau.minecraft.fps.util.Stats;
@@ -44,7 +46,17 @@ public class BlockPosRemover implements Transformer{
     private static final Type BLOCK_POS_FIXES = Type.getObjectType("net/gudenau/minecraft/fps/fixes/BlockPosFixes");
     
     private static final Stats STATS = Stats.getStats("BlockPos Remover");
-
+    
+    @Override
+    public Identifier getName(){
+        return new Identifier("gud_fps", "blockpos_remover");
+    }
+    
+    @Override
+    public boolean handlesClass(String name, String transformedName){
+        return true;
+    }
+    
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
         if(classNode.name.startsWith(NAME_BlockPos)){

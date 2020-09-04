@@ -20,24 +20,25 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.ModMetadata;
+import net.gudenau.minecraft.asm.api.v0.ClassCache;
+import net.gudenau.minecraft.asm.api.v0.Identifier;
 import net.gudenau.minecraft.fps.GudFPS;
 import net.gudenau.minecraft.fps.fixes.RPMallocFixes;
 import net.gudenau.minecraft.fps.util.LockUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.system.rpmalloc.RPmalloc;
 import org.lwjgl.util.lz4.LZ4;
 import org.lwjgl.util.xxhash.XXHash;
 
-public class TransformerCache{
-    private static boolean enabled;
+public class TransformerCache implements ClassCache{
     private static volatile boolean loaded = false;
-    
-    private static final long SEED = calculateSeed();
     
     private static final Path CACHE_PATH = Paths.get("./gud_fps/cache");
     private static volatile Long2ObjectMap<ByteBuffer> cache;
@@ -45,60 +46,60 @@ public class TransformerCache{
     
     private static Stats stats;
     
-    private static long calculateSeed(){
-        if(GudFPS.CONFIG.enableCache.get()){
-            long seed = 0xCAFEBABEDEADBEEFL;
-            List<ModContainer> mods = new LinkedList<>(FabricLoader.getInstance().getAllMods());
-            mods.sort(Comparator.comparing(m->m.getMetadata().getId()));
+    private long seed;
     
-            MessageDigest digest;
-            try{
-                digest = MessageDigest.getInstance("SHA-1");
-            }catch(NoSuchAlgorithmException e){
-                // Spec says this can't happen.....
-                System.err.println("JVM violates the MessageDigest spec.");
-                e.printStackTrace();
-                System.exit(0);
-                return -1; // Make javac happy.
-            }
-            
-            for(int i = 0; i < mods.size(); i++){
-                ModMetadata meta = mods.get(i).getMetadata();
-                digest.update((byte)i);
-                digest.update(meta.getId().getBytes(StandardCharsets.UTF_8));
-                digest.update((byte)~i);
-                digest.update(meta.getVersion().getFriendlyString().getBytes(StandardCharsets.UTF_8));
-            }
-            
-            byte[] result = digest.digest();
-            for(int i = 0; i < result.length; i++){
-                seed ^= (((long)result[i]) & 0xFF) << ((i & 7) << 3);
-            }
-            return seed;
+    private static long calculateSeed(){
+        long seed = 0xCAFEBABEDEADBEEFL;
+        List<ModContainer> mods = new LinkedList<>(FabricLoader.getInstance().getAllMods());
+        mods.sort(Comparator.comparing(m->m.getMetadata().getId()));
+    
+        MessageDigest digest;
+        try{
+            digest = MessageDigest.getInstance("SHA-1");
+        }catch(NoSuchAlgorithmException e){
+            // Spec says this can't happen.....
+            System.err.println("JVM violates the MessageDigest spec.");
+            e.printStackTrace();
+            System.exit(0);
+            return -1; // Make javac happy.
         }
-        return -1;
+    
+        for(int i = 0; i < mods.size(); i++){
+            ModMetadata meta = mods.get(i).getMetadata();
+            digest.update((byte)i);
+            digest.update(meta.getId().getBytes(StandardCharsets.UTF_8));
+            digest.update((byte)~i);
+            digest.update(meta.getVersion().getFriendlyString().getBytes(StandardCharsets.UTF_8));
+        }
+    
+        byte[] result = digest.digest();
+        for(int i = 0; i < result.length; i++){
+            seed ^= (((long)result[i]) & 0xFF) << ((i & 7) << 3);
+        }
+        return seed;
     }
     
-    public static void load(){
-        enabled = GudFPS.CONFIG.enableCache.get();
-        if(!enabled){
-            return;
-        }
+    @Override
+    public Identifier getName(){
+        return new Identifier("gud_fps", "cache");
+    }
+    
+    @Override
+    public void load(){
+        seed = calculateSeed();
         
         stats = Stats.getStats("Cache");
         
         cache = new Long2ObjectOpenHashMap<>();
         
         if(GudFPS.CONFIG.rpmalloc.get()){
-            new Thread(RPMallocFixes.runnable(TransformerCache::loadCache), "CacheLoader").start();
-            Runtime.getRuntime().addShutdownHook(new Thread(RPMallocFixes.runnable(TransformerCache::saveCache), "CacheSaver"));
+            new Thread(RPMallocFixes.runnable(this::loadCache), "CacheLoader").start();
         }else{
-            new Thread(TransformerCache::loadCache, "CacheLoader").start();
-            Runtime.getRuntime().addShutdownHook(new Thread(TransformerCache::saveCache, "CacheSaver"));
+            new Thread(this::loadCache, "CacheLoader").start();
         }
     }
     
-    private static void loadCache(){
+    private void loadCache(){
         LockUtils.withWriteLock(cacheLock, ()->{
             try{
                 if(Files.exists(CACHE_PATH)){
@@ -107,7 +108,7 @@ public class TransformerCache{
                         fileBuffer.order(ByteOrder.LITTLE_ENDIAN);
                 
                         long savedSeed = fileBuffer.getLong();
-                        if(savedSeed != SEED){
+                        if(savedSeed != seed){
                             return;
                         }
                 
@@ -147,7 +148,11 @@ public class TransformerCache{
         });
     }
     
-    private static void saveCache(){
+    @Override
+    public void save(){
+        if(GudFPS.CONFIG.rpmalloc.get()){
+            RPmalloc.rpmalloc_thread_initialize();
+        }
         try{
             Path parent = CACHE_PATH.getParent();
             if(!Files.exists(parent)){
@@ -165,7 +170,7 @@ public class TransformerCache{
             try(OutputStream outputStream = Files.newOutputStream(CACHE_PATH)){
                 WritableByteChannel channel = Channels.newChannel(outputStream);
                 
-                arrayBuffer.putLong(SEED);
+                arrayBuffer.putLong(seed);
                 arrayBuffer.putInt(GudFPS.CONFIG.hashCode());
                 arrayBuffer.putInt(cache.size());
                 stats.addStat("saved", cache.size());
@@ -206,36 +211,42 @@ public class TransformerCache{
             }
         }catch(IOException e){
             e.printStackTrace();
+        }finally{
+            if(GudFPS.CONFIG.rpmalloc.get()){
+                RPmalloc.rpmalloc_thread_finalize();
+            }
         }
     }
     
-    public static byte[] getEntry(byte[] original){
-        if(!enabled || !loaded || original == null){
-            return null;
+    @Override
+    public Optional<byte[]> getEntry(byte[] original){
+        if(!loaded || original == null){
+            return Optional.empty();
         }
         
         ByteBuffer originalBuffer = MemoryUtil.memAlloc(original.length);
         try{
             originalBuffer.put(original).position(0);
-            long hash = XXHash.XXH64(originalBuffer, SEED);
+            long hash = XXHash.XXH64(originalBuffer, seed);
             return LockUtils.withReadLock(cacheLock, ()->{
                 ByteBuffer modifiedBuffer = cache.get(hash);
                 if(modifiedBuffer == null){
                     stats.incrementStat("misses");
-                    return null;
+                    return Optional.empty();
                 }
                 stats.incrementStat("hits");
                 byte[] modified = new byte[modifiedBuffer.capacity()];
                 modifiedBuffer.get(modified).position(0);
-                return modified;
+                return Optional.of(modified);
             });
         }finally{
             MemoryUtil.memFree(originalBuffer);
         }
     }
     
-    public static void putEntry(byte[] original, byte[] modified){
-        if(!enabled || original == null || modified == null){
+    @Override
+    public void putEntry(byte[] original, byte[] modified){
+        if(original == null || modified == null){
             return;
         }
     
@@ -247,7 +258,7 @@ public class TransformerCache{
             modifiedBuffer.put(modified).position(0);
             
             originalBuffer.put(original).position(0);
-            long hash = XXHash.XXH64(originalBuffer, SEED);
+            long hash = XXHash.XXH64(originalBuffer, seed);
     
             LockUtils.withWriteLock(cacheLock, ()->
                 cache.put(hash, modifiedBuffer)

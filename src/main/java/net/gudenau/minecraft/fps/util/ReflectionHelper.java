@@ -106,6 +106,10 @@ public class ReflectionHelper{
         );
     }
     
+    public static MethodHandle unreflect(Method method) throws IllegalAccessException{
+        return IMPL_LOOKUP.unreflect(method);
+    }
+    
     private static final class UnsafeHelper{
         private static final Class<?> Unsafe = loadUnsafe();
         private static final Object theUnsafe = getUnsafe();

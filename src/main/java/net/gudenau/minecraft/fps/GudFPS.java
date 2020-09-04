@@ -139,13 +139,11 @@ public class GudFPS implements ModInitializer{
         public final Option<Boolean> removeBlockPos = new BooleanOption("removeBlockPos", true);
         public final Option<Boolean> precomputeConstants = new BooleanOption("precomputeConstants", true);
         public final Option<Boolean> optimizeMath = new BooleanOption("optimizeMath", true);
-        public final Option<Boolean> enableCache = new BooleanOption("enableCache", true);
         public final Option<Boolean> rpmalloc = new BooleanOption("rpmalloc", true);
         public final Option<Boolean> dump = new BooleanOption("dump", false);
         public final Option<Boolean> forceDump = new BooleanOption("forceDump", false);
         public final Option<Boolean> verify = new BooleanOption("verify", false);
         public final Option<Boolean> forceLoadClasses = new BooleanOption("forceLoadClasses", true);
-        public final Option<Boolean> enableInline = new BooleanOption("enableInline", true);
     
         private Config(Map<String, String> options){
             try{
@@ -179,13 +177,11 @@ public class GudFPS implements ModInitializer{
             return Objects.equals(removeForEach, config.removeForEach) &&
                    Objects.equals(removeBlockPos, config.removeBlockPos) &&
                    Objects.equals(precomputeConstants, config.precomputeConstants) &&
-                   Objects.equals(enableCache, config.enableCache) &&
                    Objects.equals(rpmalloc, config.rpmalloc) &&
                    Objects.equals(dump, config.dump) &&
                    Objects.equals(forceDump, config.forceDump) &&
                    Objects.equals(verify, config.verify) &&
-                   Objects.equals(optimizeMath, config.optimizeMath) &&
-                   Objects.equals(enableInline, config.enableInline);
+                   Objects.equals(optimizeMath, config.optimizeMath);
         }
     
         @Override
@@ -195,8 +191,8 @@ public class GudFPS implements ModInitializer{
                 (removeBlockPos.get() ? (1 << 1) : 0) |
                 (precomputeConstants.get() ? (1 << 2) : 0) |
                 (rpmalloc.get() ? (1 << 3) : 0) |
-                (optimizeMath.get() ? (1 << 4) : 0) |
-                (enableInline.get() ? (1 << 5) : 0);
+                (optimizeMath.get() ? (1 << 4) : 0);
+                // Bit 5 is reserved
         }
     }
     
