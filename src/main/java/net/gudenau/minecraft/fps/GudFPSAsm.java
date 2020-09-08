@@ -7,6 +7,7 @@ import java.nio.file.Paths;
 import net.gudenau.minecraft.asm.api.v0.AsmInitializer;
 import net.gudenau.minecraft.asm.api.v0.AsmRegistry;
 import net.gudenau.minecraft.fps.transformer.*;
+import net.gudenau.minecraft.fps.transformer.client.DisableRendererThreadChecks;
 import net.gudenau.minecraft.fps.util.LibraryLoader;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.rpmalloc.RPmalloc;
@@ -48,6 +49,7 @@ public class GudFPSAsm implements AsmInitializer{
         config.removeForEach.doIf(true, ()->registry.registerTransformer(new ForEachRemover()));
         config.precomputeConstants.doIf(true, ()->registry.registerTransformer(new ConstantPrecomputer()));
         config.optimizeMath.doIf(true, ()->registry.registerTransformer(new MathOptimizer()));
+        config.disableRendererThreadChecks.doIf(true, ()->registry.registerTransformer(new DisableRendererThreadChecks()));
         if(devel){
             config.removeBlockPos.doIf(true, ()->registry.registerTransformer(new BlockPosRemover()));
             config.rpmalloc.doIf(true, ()->registry.registerTransformer(new RPmallocTransformer()));

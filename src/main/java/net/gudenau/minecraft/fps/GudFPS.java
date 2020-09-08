@@ -21,6 +21,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import net.fabricmc.api.EnvType;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.gudenau.minecraft.fps.util.Stats;
@@ -142,12 +143,18 @@ public class GudFPS implements ModInitializer{
         public final Option<Boolean> rpmalloc = new BooleanOption("rpmalloc", true);
         public final Option<Boolean> verify = new BooleanOption("verify", false);
         public final Option<Boolean> forceLoadClasses = new BooleanOption("forceLoadClasses", true);
+        public final Option<Boolean> disableRendererThreadChecks = new ClientBooleanOption("disableRendererThreadChecks", true);
     
         private Config(Map<String, String> options){
             try{
+                boolean client = FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT;
                 Map<String, String> realOptions = new HashMap<>();
                 for(Field field : getClass().getDeclaredFields()){
                     Option<?> option = (Option<?>)field.get(this);
+                    if(!client && option instanceof ClientOption){
+                        ((ClientOption)option).disable();
+                        continue;
+                    }
                     String value = options.get(option.getName());
                     if(value != null){
                         try{
@@ -177,7 +184,8 @@ public class GudFPS implements ModInitializer{
                    Objects.equals(precomputeConstants, config.precomputeConstants) &&
                    Objects.equals(rpmalloc, config.rpmalloc) &&
                    Objects.equals(verify, config.verify) &&
-                   Objects.equals(optimizeMath, config.optimizeMath);
+                   Objects.equals(optimizeMath, config.optimizeMath) &&
+                   Objects.equals(disableRendererThreadChecks, config.disableRendererThreadChecks);
         }
     
         @Override
@@ -187,15 +195,20 @@ public class GudFPS implements ModInitializer{
                 (removeBlockPos.get() ? (1 << 1) : 0) |
                 (precomputeConstants.get() ? (1 << 2) : 0) |
                 (rpmalloc.get() ? (1 << 3) : 0) |
-                (optimizeMath.get() ? (1 << 4) : 0);
+                (optimizeMath.get() ? (1 << 4) : 0) |
                 // Bit 5 is reserved
+                (disableRendererThreadChecks.get() ? (1 << 6) : 0);
         }
+    }
+    
+    private interface ClientOption{
+        void disable();
     }
     
     public static class Option<T>{
         private final String name;
         private final Function<String, T> parser;
-        private T value;
+        T value;
     
         private Option(String name, T value, Function<String, T> parser){
             this.name = name;
@@ -240,9 +253,20 @@ public class GudFPS implements ModInitializer{
         }
     }
     
-    private static final class BooleanOption extends Option<Boolean>{
+    private static class BooleanOption extends Option<Boolean>{
         private BooleanOption(String name, boolean value){
             super(name, value, Boolean::parseBoolean);
+        }
+    }
+    
+    private static class ClientBooleanOption extends BooleanOption implements ClientOption{
+        private ClientBooleanOption(String name, boolean value){
+            super(name, value);
+        }
+    
+        @Override
+        public void disable(){
+            value = false;
         }
     }
 }
