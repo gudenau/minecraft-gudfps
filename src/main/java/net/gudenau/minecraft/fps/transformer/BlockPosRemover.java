@@ -14,10 +14,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.MappingResolver;
+import net.gudenau.minecraft.asm.api.v0.AsmUtils;
 import net.gudenau.minecraft.asm.api.v0.Identifier;
 import net.gudenau.minecraft.asm.api.v0.Transformer;
 import net.gudenau.minecraft.fps.util.ArrayUtils;
-import net.gudenau.minecraft.fps.util.AsmUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
@@ -65,8 +65,8 @@ public class BlockPosRemover implements Transformer{
                 STATS.incrementStat("gutted methods");
                 InsnList instructions = method.instructions;
                 instructions.clear();
-                instructions.add(AsmUtils.throwException(
-                    RuntimeException.class,
+                instructions.add(AsmUtils.getInstance().createExceptionList(
+                    Type.getType(RuntimeException.class),
                     String.format("BlockPos.%s%s was called", method.name, method.desc)
                 ));
             });
@@ -437,9 +437,9 @@ public class BlockPosRemover implements Transformer{
     }
     
     private AbstractInsnNode transformNew(InsnList instructions, TypeInsnNode node){
-        MethodInsnNode init = AsmUtils.findInstruction(node, (isn)->
+        MethodInsnNode init = AsmUtils.getInstance().<MethodInsnNode>findNextNode(node, (isn)->
             isn.getType() == AbstractInsnNode.METHOD_INSN && ((MethodInsnNode)isn).name.equals("<init>")
-        );
+        ).orElse(null);
         
         String initDesc = init.desc;
         initDesc = initDesc.substring(0, initDesc.length() - 1) + 'J';

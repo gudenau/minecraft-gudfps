@@ -1,14 +1,14 @@
 package net.gudenau.minecraft.fps.transformer;
 
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import net.gudenau.minecraft.asm.api.v0.AsmUtils;
 import net.gudenau.minecraft.asm.api.v0.Identifier;
 import net.gudenau.minecraft.asm.api.v0.Transformer;
-import net.gudenau.minecraft.fps.util.AsmUtils;
 import net.gudenau.minecraft.fps.util.LockUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.Handle;
@@ -35,13 +35,15 @@ public class ForEachRemover implements Transformer{
     
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
+        AsmUtils utils = AsmUtils.getInstance();
+
         AtomicBoolean changed = new AtomicBoolean(false);
         
         LockUtils.withWriteLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.put(classNode.name, (classNode.access & ACC_INTERFACE) != 0));
         
         for(MethodNode method : classNode.methods){
             InsnList instructions = method.instructions;
-            AsmUtils.<InvokeDynamicInsnNode>findNodes(instructions, (node)->{
+            utils.<InvokeDynamicInsnNode>findMatchingNodes(instructions, (node)->{
                 // Get all the dynamic nodes that look right
                 if(node instanceof InvokeDynamicInsnNode){
                     InvokeDynamicInsnNode invoke = (InvokeDynamicInsnNode)node;
@@ -64,7 +66,7 @@ public class ForEachRemover implements Transformer{
                 
                 // Extra info from existing instructions
                 Handle targetHandle = (Handle)invokeDynamic.bsmArgs[1];
-                int targetOpcode = AsmUtils.opcodeFromHandle(targetHandle);
+                int targetOpcode = utils.getOpcodeFromHandle(targetHandle);
                 Type targetType = (Type)invokeDynamic.bsmArgs[2];
                 
                 // Figure out our starting indices

@@ -2,9 +2,11 @@ package net.gudenau.minecraft.fps.transformer;
 
 import java.util.HashSet;
 import java.util.Set;
+
+import net.gudenau.minecraft.asm.api.v0.AsmUtils;
 import net.gudenau.minecraft.asm.api.v0.Identifier;
 import net.gudenau.minecraft.asm.api.v0.Transformer;
-import net.gudenau.minecraft.fps.util.AsmUtils;
+import net.gudenau.minecraft.fps.util.StagingAsmUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -30,10 +32,12 @@ public class RPmallocTransformer implements Transformer{
     
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
+        AsmUtils utils = AsmUtils.getInstance();
+
         boolean changed = false;
     
         if(classNode.superName.equals("java/lang/Thread")){
-            AsmUtils.findMethod(classNode, "run", "()V").ifPresent((method)->{
+            utils.findMethod(classNode, "run", "()V").ifPresent((method)->{
                 method.instructions.insert(new MethodInsnNode(
                     INVOKESTATIC,
                     "net/gudenau/minecraft/fps/fixes/RPMallocFixes",
@@ -42,7 +46,7 @@ public class RPmallocTransformer implements Transformer{
                     false
                 ));
     
-                for(AbstractInsnNode node : AsmUtils.findReturns(method.instructions)){
+                for(AbstractInsnNode node : utils.findReturns(method.instructions)){
                     method.instructions.insertBefore(node, new MethodInsnNode(
                         INVOKESTATIC,
                         "net/gudenau/minecraft/fps/fixes/RPMallocFixes",
@@ -58,7 +62,7 @@ public class RPmallocTransformer implements Transformer{
         }
         
         if(classNode.superName.equals("java/util/concurrent/ForkJoinWorkerThread")){
-            MethodNode method = AsmUtils.findOrCreateMethod(classNode, ACC_PUBLIC, "java/util/concurrent/ForkJoinWorkerThread", "onStart", "()V");
+            MethodNode method = StagingAsmUtils.findOrCreateMethod(classNode, ACC_PUBLIC, "java/util/concurrent/ForkJoinWorkerThread", "onStart", "()V");
             method.instructions.insert(new MethodInsnNode(
                 INVOKESTATIC,
                 "net/gudenau/minecraft/fps/fixes/RPMallocFixes",
@@ -67,8 +71,8 @@ public class RPmallocTransformer implements Transformer{
                 false
             ));
     
-            method = AsmUtils.findOrCreateMethod(classNode, ACC_PUBLIC, "java/util/concurrent/ForkJoinWorkerThread", "onTermination", "(Ljava/lang/Throwable;)V");
-            for(InsnNode node : AsmUtils.findReturns(method.instructions)){
+            method = StagingAsmUtils.findOrCreateMethod(classNode, ACC_PUBLIC, "java/util/concurrent/ForkJoinWorkerThread", "onTermination", "(Ljava/lang/Throwable;)V");
+            for(InsnNode node : utils.findReturns(method.instructions)){
                 method.instructions.insertBefore(node, new MethodInsnNode(
                     INVOKESTATIC,
                     "net/gudenau/minecraft/fps/fixes/RPMallocFixes",

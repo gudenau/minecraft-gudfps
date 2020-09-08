@@ -1,10 +1,11 @@
 package net.gudenau.minecraft.fps.transformer;
 
-import java.util.Set;
+import java.util.List;
+
+import net.gudenau.minecraft.asm.api.v0.AsmUtils;
 import net.gudenau.minecraft.asm.api.v0.Identifier;
 import net.gudenau.minecraft.asm.api.v0.Transformer;
 import net.gudenau.minecraft.fps.util.ArrayUtils;
-import net.gudenau.minecraft.fps.util.AsmUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -59,9 +60,10 @@ public class ConstantPrecomputer implements Transformer{
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
         boolean changed = false;
+        AsmUtils utils = AsmUtils.getInstance();
         for(MethodNode method : classNode.methods){
             InsnList instructions = method.instructions;
-            Set<InsnNode> nodes = AsmUtils.getMatchingNodes(instructions, (node)->
+            List<InsnNode> nodes = utils.findMatchingNodes(instructions, (node)->
                 ArrayUtils.contains(INSTRUCTIONS_MATH, node.getOpcode())
             );
             if(nodes.isEmpty()){

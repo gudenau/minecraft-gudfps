@@ -140,8 +140,6 @@ public class GudFPS implements ModInitializer{
         public final Option<Boolean> precomputeConstants = new BooleanOption("precomputeConstants", true);
         public final Option<Boolean> optimizeMath = new BooleanOption("optimizeMath", true);
         public final Option<Boolean> rpmalloc = new BooleanOption("rpmalloc", true);
-        public final Option<Boolean> dump = new BooleanOption("dump", false);
-        public final Option<Boolean> forceDump = new BooleanOption("forceDump", false);
         public final Option<Boolean> verify = new BooleanOption("verify", false);
         public final Option<Boolean> forceLoadClasses = new BooleanOption("forceLoadClasses", true);
     
@@ -178,8 +176,6 @@ public class GudFPS implements ModInitializer{
                    Objects.equals(removeBlockPos, config.removeBlockPos) &&
                    Objects.equals(precomputeConstants, config.precomputeConstants) &&
                    Objects.equals(rpmalloc, config.rpmalloc) &&
-                   Objects.equals(dump, config.dump) &&
-                   Objects.equals(forceDump, config.forceDump) &&
                    Objects.equals(verify, config.verify) &&
                    Objects.equals(optimizeMath, config.optimizeMath);
         }
