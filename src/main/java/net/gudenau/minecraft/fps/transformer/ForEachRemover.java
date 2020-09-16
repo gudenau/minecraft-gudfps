@@ -9,7 +9,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import net.gudenau.minecraft.asm.api.v0.AsmUtils;
 import net.gudenau.minecraft.asm.api.v0.Identifier;
 import net.gudenau.minecraft.asm.api.v0.Transformer;
-import net.gudenau.minecraft.fps.util.LockUtils;
+import net.gudenau.minecraft.fps.util.threading.SynchronizedUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Type;
@@ -39,7 +39,7 @@ public class ForEachRemover implements Transformer{
 
         AtomicBoolean changed = new AtomicBoolean(false);
         
-        LockUtils.withWriteLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.put(classNode.name, (classNode.access & ACC_INTERFACE) != 0));
+        SynchronizedUtils.withWriteLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.put(classNode.name, (classNode.access & ACC_INTERFACE) != 0));
         
         for(MethodNode method : classNode.methods){
             InsnList instructions = method.instructions;
@@ -91,11 +91,11 @@ public class ForEachRemover implements Transformer{
                 boolean isCollectionInterface;
                 try{
                     // Is this really the best way?
-                    Boolean bool = LockUtils.withReadLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.get(collection));
+                    Boolean bool = SynchronizedUtils.withReadLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.get(collection));
                     if(bool == null){
                         Class<?> collectionClass = getClass().getClassLoader().loadClass(collection.replaceAll("/", "."));
                         isCollectionInterface = collectionClass.isInterface();
-                        LockUtils.withWriteLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.put(collection, isCollectionInterface));
+                        SynchronizedUtils.withWriteLock(INTERFACE_MAP_LOCK, ()->INTERFACE_MAP.put(collection, isCollectionInterface));
                     }else{
                         isCollectionInterface = bool;
                     }

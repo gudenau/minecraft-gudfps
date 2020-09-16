@@ -26,18 +26,22 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.gudenau.minecraft.fps.util.Stats;
 import net.minecraft.block.Block;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class GudFPS implements ModInitializer{
     public static final Config CONFIG = loadConfig();
+    
+    private static final Logger LOGGER = LogManager.getLogger("gud_fps");
     
     private final Stats stats = Stats.getStats("Force Loader");
     
     @Override
     public void onInitialize(){
-        System.err.println("Things will break, GudFPS is not meant to be 100% stable. :3");
+        LOGGER.fatal("Things may break, GudFPS is not meant to be 100% stable. :3");
         
         if(CONFIG.forceLoadClasses.get()){
-            System.err.println("Force loading Minecraft classes, this might take a moment...");
+            LOGGER.warn("Force loading Minecraft classes, this might take a moment...");
             try{
                 Path path = Paths.get(Block.class.getProtectionDomain().getCodeSource().getLocation().toURI());
                 if(Files.isDirectory(path)){
@@ -46,7 +50,7 @@ public class GudFPS implements ModInitializer{
                     forceLoadJar(path);
                 }
             }catch(IOException | URISyntaxException ignored){
-                System.err.println("Failed to force load classes");
+                LOGGER.fatal("Failed to force load classes");
             }
         }
     }
@@ -93,7 +97,7 @@ public class GudFPS implements ModInitializer{
     }
     
     private static Config loadConfig(){
-        Path parentPath = FabricLoader.getInstance().getConfigDirectory().toPath().resolve("gud");
+        Path parentPath = FabricLoader.getInstance().getConfigDir().resolve("gud");
         Path path = parentPath.resolve("fps.conf");
         
         try{
@@ -144,6 +148,7 @@ public class GudFPS implements ModInitializer{
         public final Option<Boolean> verify = new BooleanOption("verify", false);
         public final Option<Boolean> forceLoadClasses = new BooleanOption("forceLoadClasses", true);
         public final Option<Boolean> disableRendererThreadChecks = new ClientBooleanOption("disableRendererThreadChecks", true);
+        public final Option<Boolean> identifierPool = new BooleanOption("identifierPool", true);
     
         private Config(Map<String, String> options){
             try{
@@ -161,7 +166,11 @@ public class GudFPS implements ModInitializer{
                             option.set(value);
                         }catch(Throwable ignored){}
                     }
-                    realOptions.put(option.getName(), String.valueOf(option.get()));
+                    if(option instanceof DependentOption){
+                        realOptions.put(option.getName(), String.valueOf(((DependentOption<?>)option).getTrue()));
+                    }else{
+                        realOptions.put(option.getName(), String.valueOf(option.get()));
+                    }
                 }
                 options.clear();
                 realOptions.forEach(options::put);
@@ -185,9 +194,11 @@ public class GudFPS implements ModInitializer{
                    Objects.equals(rpmalloc, config.rpmalloc) &&
                    Objects.equals(verify, config.verify) &&
                    Objects.equals(optimizeMath, config.optimizeMath) &&
-                   Objects.equals(disableRendererThreadChecks, config.disableRendererThreadChecks);
+                   Objects.equals(disableRendererThreadChecks, config.disableRendererThreadChecks) &&
+                   Objects.equals(identifierPool, config.identifierPool);
         }
     
+        @SuppressWarnings("PointlessBitwiseExpression")
         @Override
         public int hashCode(){
             return
@@ -196,13 +207,17 @@ public class GudFPS implements ModInitializer{
                 (precomputeConstants.get() ? (1 << 2) : 0) |
                 (rpmalloc.get() ? (1 << 3) : 0) |
                 (optimizeMath.get() ? (1 << 4) : 0) |
-                // Bit 5 is reserved
-                (disableRendererThreadChecks.get() ? (1 << 6) : 0);
+                (disableRendererThreadChecks.get() ? (1 << 5) : 0) |
+                (identifierPool.get() ? (1 << 6) : 0);
         }
     }
     
     private interface ClientOption{
         void disable();
+    }
+    
+    private interface DependentOption<T>{
+        T getTrue();
     }
     
     public static class Option<T>{
@@ -229,7 +244,7 @@ public class GudFPS implements ModInitializer{
         }
         
         public void doIf(T value, Runnable task){
-            if(this.value.equals(value)){
+            if(get().equals(value)){
                 task.run();
             }
         }
@@ -267,6 +282,31 @@ public class GudFPS implements ModInitializer{
         @Override
         public void disable(){
             value = false;
+        }
+    }
+    
+    private static class DependentBooleanOption extends BooleanOption implements DependentOption<Boolean>{
+        private final Option<Boolean>[] dependencies;
+    
+        @SafeVarargs
+        private DependentBooleanOption(String name, boolean defaultValue, Option<Boolean>... dependencies){
+            super(name, defaultValue);
+            this.dependencies = dependencies;
+        }
+    
+        @Override
+        public Boolean getTrue(){
+            return super.get();
+        }
+        
+        @Override
+        public Boolean get(){
+            for(Option<Boolean> dependency : dependencies){
+                if(!dependency.get()){
+                    return false;
+                }
+            }
+            return super.get();
         }
     }
 }

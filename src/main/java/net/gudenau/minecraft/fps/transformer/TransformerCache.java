@@ -30,7 +30,7 @@ import net.gudenau.minecraft.asm.api.v0.ClassCache;
 import net.gudenau.minecraft.asm.api.v0.Identifier;
 import net.gudenau.minecraft.fps.GudFPS;
 import net.gudenau.minecraft.fps.fixes.RPMallocFixes;
-import net.gudenau.minecraft.fps.util.LockUtils;
+import net.gudenau.minecraft.fps.util.threading.SynchronizedUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.rpmalloc.RPmalloc;
@@ -100,7 +100,7 @@ public class TransformerCache implements ClassCache{
     }
     
     private void loadCache(){
-        LockUtils.withWriteLock(cacheLock, ()->{
+        SynchronizedUtils.withWriteLock(cacheLock, ()->{
             try{
                 if(Files.exists(CACHE_PATH)){
                     try(RandomAccessFile file = new RandomAccessFile(CACHE_PATH.toFile(), "r")){
@@ -228,7 +228,7 @@ public class TransformerCache implements ClassCache{
         try{
             originalBuffer.put(original).position(0);
             long hash = XXHash.XXH64(originalBuffer, seed);
-            return LockUtils.withReadLock(cacheLock, ()->{
+            return SynchronizedUtils.withReadLock(cacheLock, ()->{
                 ByteBuffer modifiedBuffer = cache.get(hash);
                 if(modifiedBuffer == null){
                     stats.incrementStat("misses");
@@ -260,7 +260,7 @@ public class TransformerCache implements ClassCache{
             originalBuffer.put(original).position(0);
             long hash = XXHash.XXH64(originalBuffer, seed);
     
-            LockUtils.withWriteLock(cacheLock, ()->
+            SynchronizedUtils.withWriteLock(cacheLock, ()->
                 cache.put(hash, modifiedBuffer)
             );
         }finally{

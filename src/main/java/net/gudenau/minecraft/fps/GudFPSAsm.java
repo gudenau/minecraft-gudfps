@@ -50,6 +50,7 @@ public class GudFPSAsm implements AsmInitializer{
         config.precomputeConstants.doIf(true, ()->registry.registerTransformer(new ConstantPrecomputer()));
         config.optimizeMath.doIf(true, ()->registry.registerTransformer(new MathOptimizer()));
         config.disableRendererThreadChecks.doIf(true, ()->registry.registerTransformer(new DisableRendererThreadChecks()));
+        config.identifierPool.doIf(true, ()->registry.registerTransformer(new IdentifierPoolTransformer()));
         if(devel){
             config.removeBlockPos.doIf(true, ()->registry.registerTransformer(new BlockPosRemover()));
             config.rpmalloc.doIf(true, ()->registry.registerTransformer(new RPmallocTransformer()));

@@ -66,10 +66,6 @@ public class DisableRendererThreadChecks implements Transformer{
             }
         }
         
-        if(changed){
-            System.out.println(classNode.name);
-        }
-        
         return changed;
     }
 }

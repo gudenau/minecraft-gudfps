@@ -1,5 +1,7 @@
 package net.gudenau.minecraft.fps.util;
 
+import net.gudenau.minecraft.fps.util.threading.SynchronizedUtils;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -12,11 +14,11 @@ public class Stats{
     
     static{
         Runtime.getRuntime().addShutdownHook(new Thread(()->
-            LockUtils.withReadLock(STAT_MAP_LOCK, ()->{
+            SynchronizedUtils.withReadLock(STAT_MAP_LOCK, ()->{
                 StringBuilder builder = new StringBuilder();
                 STAT_MAP.values().forEach((stat)->{
                     builder.append(stat.name).append(":\n");
-                    LockUtils.withReadLock(stat.statMapLock, ()->stat.statMap.forEach((name, value)->
+                    SynchronizedUtils.withReadLock(stat.statMapLock, ()->stat.statMap.forEach((name, value)->
                         builder.append("    ").append(name).append(": ").append(value.get()).append("\n")
                     ));
                 });
@@ -27,11 +29,11 @@ public class Stats{
     }
     
     public static Stats getStats(String name){
-        Stats stats = LockUtils.withReadLock(STAT_MAP_LOCK, ()->STAT_MAP.get(name));
+        Stats stats = SynchronizedUtils.withReadLock(STAT_MAP_LOCK, ()->STAT_MAP.get(name));
         if(stats != null){
             return stats;
         }
-        return LockUtils.withWriteLock(STAT_MAP_LOCK, ()->STAT_MAP.computeIfAbsent(name, Stats::new));
+        return SynchronizedUtils.withWriteLock(STAT_MAP_LOCK, ()->STAT_MAP.computeIfAbsent(name, Stats::new));
     }
     
     private final String name;
@@ -44,9 +46,9 @@ public class Stats{
     }
     
     public void incrementStat(String stat){
-        AtomicLong value = LockUtils.withReadLock(statMapLock, ()->statMap.get(stat));
+        AtomicLong value = SynchronizedUtils.withReadLock(statMapLock, ()->statMap.get(stat));
         if(value == null){
-            value = LockUtils.withWriteLock(statMapLock, ()->
+            value = SynchronizedUtils.withWriteLock(statMapLock, ()->
                 statMap.computeIfAbsent(stat, (n)->new AtomicLong(0))
             );
         }
@@ -54,9 +56,9 @@ public class Stats{
     }
     
     public void addStat(String stat, int amount){
-        AtomicLong value = LockUtils.withReadLock(statMapLock, ()->statMap.get(stat));
+        AtomicLong value = SynchronizedUtils.withReadLock(statMapLock, ()->statMap.get(stat));
         if(value == null){
-            value = LockUtils.withWriteLock(statMapLock, ()->
+            value = SynchronizedUtils.withWriteLock(statMapLock, ()->
                 statMap.computeIfAbsent(stat, (n)->new AtomicLong(amount))
             );
         }else{
@@ -65,11 +67,11 @@ public class Stats{
     }
     
     public long getStat(String stat){
-        AtomicLong value = LockUtils.withReadLock(statMapLock, ()->statMap.get(stat));
+        AtomicLong value = SynchronizedUtils.withReadLock(statMapLock, ()->statMap.get(stat));
         if(value != null){
             return value.get();
         }else{
-            return LockUtils.withWriteLock(statMapLock, ()->
+            return SynchronizedUtils.withWriteLock(statMapLock, ()->
                 statMap.computeIfAbsent(stat, (n)->new AtomicLong(0)).get()
             );
         }

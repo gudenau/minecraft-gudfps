@@ -2,12 +2,11 @@ package net.gudenau.minecraft.fps.util;
 
 import net.gudenau.minecraft.asm.api.v0.AsmUtils;
 import net.gudenau.minecraft.asm.api.v0.TypeCache;
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Type;
+import net.gudenau.minecraft.asm.api.v0.type.MethodType;
+import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 
+import java.lang.reflect.Method;
 import java.util.*;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -23,11 +22,11 @@ public class StagingAsmUtils{
             return false;
         }
 
-        TypeCache typeCache = TypeCache.getTypeCache();
+        TypeCache Type = TypeCache.getTypeCache();
         boolean changed = false;
 
         for(int i = 0; i < types.size(); i++){
-            Type oldType = typeCache.getObjectType(types.get(i));
+            Type oldType = Type.getObjectType(types.get(i));
             Type newType = typeMap.get(oldType);
             if(newType != null){
                 types.set(i, newType.getInternalName());
@@ -39,12 +38,11 @@ public class StagingAsmUtils{
     }
 
     public static boolean remapTypes(ClassNode classNode, Map<Type, Type> typeMap){
-        TypeCache typeCache = TypeCache.getTypeCache();
         boolean changed = false;
 
         classNode.signature = remapSignature(classNode.signature, typeMap);
 
-        Type oldType = typeCache.getObjectType(classNode.superName);
+        Type oldType = Type.getObjectType(classNode.superName);
         Type newType = typeMap.get(oldType);
         if(newType != null){
             classNode.superName = newType.getInternalName();
@@ -54,7 +52,7 @@ public class StagingAsmUtils{
         changed |= remapStringTypes(classNode.interfaces, typeMap);
 
         if(classNode.outerClass != null){
-            oldType = typeCache.getObjectType(classNode.outerClass);
+            oldType = Type.getObjectType(classNode.outerClass);
             newType = typeMap.get(oldType);
             if(newType != null){
                 classNode.outerClass = newType.getInternalName();
@@ -67,7 +65,7 @@ public class StagingAsmUtils{
         List<InnerClassNode> innerClasses = classNode.innerClasses;
         if(innerClasses != null && !innerClasses.isEmpty()){
             for(InnerClassNode innerClass : innerClasses){
-                oldType = typeCache.getObjectType(innerClass.name);
+                oldType = Type.getObjectType(innerClass.name);
                 newType = typeMap.get(oldType);
                 if(newType != null){
                     innerClass.name = newType.getInternalName();
@@ -79,7 +77,7 @@ public class StagingAsmUtils{
                 }
 
                 if(innerClass.outerName != null){
-                    oldType = typeCache.getObjectType(innerClass.outerName);
+                    oldType = Type.getObjectType(innerClass.outerName);
                     newType = typeMap.get(oldType);
                     if(newType != null){
                         innerClass.outerName = newType.getInternalName();
@@ -92,7 +90,7 @@ public class StagingAsmUtils{
         List<FieldNode> fields = classNode.fields;
         if(fields != null && !fields.isEmpty()){
             for(FieldNode field : fields){
-                oldType = typeCache.getType(field.desc);
+                oldType = Type.getType(field.desc);
                 newType = typeMap.get(oldType);
                 if(newType != null){
                     field.desc = newType.getDescriptor();
@@ -113,10 +111,9 @@ public class StagingAsmUtils{
     }
 
     public static boolean remapTypes(MethodNode method, Map<Type, Type> typeMap){
-        TypeCache typeCache = TypeCache.getTypeCache();
         boolean changed = false;
 
-        Type oldType = typeCache.getMethodType(method.desc);
+        Type oldType = Type.getMethodType(method.desc);
         Type newType = remapMethodType(oldType, typeMap);
         if(newType != null){
             method.desc = newType.getDescriptor();
@@ -133,7 +130,7 @@ public class StagingAsmUtils{
         List<LocalVariableNode> localVariables = method.localVariables;
         if(localVariables != null && !localVariables.isEmpty()){
             for(LocalVariableNode localVariable : localVariables){
-                oldType = typeCache.getType(localVariable.desc);
+                oldType = Type.getType(localVariable.desc);
                 newType = typeMap.get(oldType);
                 if(newType != null){
                     changed = true;
@@ -147,7 +144,7 @@ public class StagingAsmUtils{
             switch(instruction.getType()){
                 case AbstractInsnNode.TYPE_INSN:{
                     TypeInsnNode node = (TypeInsnNode)instruction;
-                    oldType = typeCache.getObjectType(node.desc);
+                    oldType = Type.getObjectType(node.desc);
                     newType = typeMap.get(oldType);
                     if(newType != null){
                         node.desc = newType.getInternalName();
@@ -158,14 +155,14 @@ public class StagingAsmUtils{
                 case AbstractInsnNode.FIELD_INSN:{
                     FieldInsnNode node = (FieldInsnNode)instruction;
 
-                    oldType = typeCache.getObjectType(node.owner);
+                    oldType = Type.getObjectType(node.owner);
                     newType = typeMap.get(oldType);
                     if(newType != null){
                         node.owner = newType.getInternalName();
                         changed = true;
                     }
 
-                    oldType = typeCache.getType(node.desc);
+                    oldType = Type.getType(node.desc);
                     newType = typeMap.get(oldType);
                     if(newType != null){
                         node.desc = newType.getDescriptor();
@@ -176,15 +173,15 @@ public class StagingAsmUtils{
                 case AbstractInsnNode.METHOD_INSN:{
                     MethodInsnNode node = (MethodInsnNode)instruction;
 
-                    oldType = typeCache.getObjectType(node.owner);
+                    oldType = Type.getObjectType(node.owner);
                     newType = typeMap.get(oldType);
                     if(newType != null){
                         node.owner = newType.getInternalName();
                         changed = true;
                     }
 
-                    oldType = typeCache.getType(node.desc);
-                    newType = typeMap.get(oldType);
+                    oldType = Type.getType(node.desc);
+                    newType = remapMethodType(oldType, typeMap);
                     if(newType != null){
                         node.desc = newType.getDescriptor();
                         changed = true;
@@ -194,7 +191,7 @@ public class StagingAsmUtils{
                 case AbstractInsnNode.INVOKE_DYNAMIC_INSN:{
                     InvokeDynamicInsnNode node = (InvokeDynamicInsnNode)instruction;
 
-                    oldType = typeCache.getMethodType(node.desc);
+                    oldType = Type.getMethodType(node.desc);
                     newType = remapMethodType(oldType, typeMap);
                     if(newType != null){
                         node.desc = newType.getDescriptor();
@@ -239,7 +236,7 @@ public class StagingAsmUtils{
 
                 case AbstractInsnNode.MULTIANEWARRAY_INSN:{
                     MultiANewArrayInsnNode node = (MultiANewArrayInsnNode)instruction;
-                    oldType = typeCache.getType(node.desc);
+                    oldType = Type.getType(node.desc);
                     newType = typeMap.get(oldType);
                     if(newType != null){
                         node.desc = newType.getDescriptor();
@@ -255,7 +252,7 @@ public class StagingAsmUtils{
                         for(int i = 0; i < locals.size(); i++){
                             Object local = locals.get(i);
                             if(local instanceof String){
-                                oldType = typeCache.getObjectType((String)local);
+                                oldType = Type.getObjectType((String)local);
                                 newType = typeMap.get(oldType);
                                 if(newType != null){
                                     locals.set(i, newType.getInternalName());
@@ -270,7 +267,7 @@ public class StagingAsmUtils{
                         for(int i = 0; i < stacks.size(); i++){
                             Object stack = stacks.get(i);
                             if(stack instanceof String){
-                                oldType = typeCache.getObjectType((String)stack);
+                                oldType = Type.getObjectType((String)stack);
                                 newType = typeMap.get(oldType);
                                 if(newType != null){
                                     stacks.set(i, newType.getInternalName());
@@ -289,8 +286,7 @@ public class StagingAsmUtils{
     private static Handle remapHandle(Handle handle, Map<Type, Type> typeMap){
         boolean changed = false;
 
-        TypeCache typeCache = TypeCache.getTypeCache();
-        Type oldType = typeCache.getObjectType(handle.getOwner());
+        Type oldType = Type.getObjectType(handle.getOwner());
         Type newType = typeMap.get(oldType);
         String owner;
         if(newType == null){
@@ -300,7 +296,7 @@ public class StagingAsmUtils{
             changed = true;
         }
 
-        oldType = typeCache.getMethodType(handle.getDesc());
+        oldType = Type.getMethodType(handle.getDesc());
         newType = remapMethodType(oldType, typeMap);
         String desc;
         if(newType == null){
@@ -342,7 +338,7 @@ public class StagingAsmUtils{
             changed = true;
         }
 
-        return changed ? TypeCache.getTypeCache().getMethodType(newType, params) : null;
+        return changed ? Type.getMethodType(newType, params) : null;
     }
 
     public static boolean remapAnnotations(ClassNode owner, Map<Type, Type> typeMap){
@@ -354,12 +350,11 @@ public class StagingAsmUtils{
     }
 
     public static boolean remapAnnotations(List<AnnotationNode> visible, List<AnnotationNode> invisible, Map<Type, Type> typeMap){
-        TypeCache typeCache = TypeCache.getTypeCache();
         boolean changed = false;
 
         if(visible != null && !visible.isEmpty()){
             for(AnnotationNode annotation : visible){
-                Type oldType = typeCache.getObjectType(annotation.desc);
+                Type oldType = Type.getObjectType(annotation.desc);
                 Type newType = typeMap.get(oldType);
                 if(newType != null){
                     annotation.desc = newType.getInternalName();
@@ -370,7 +365,7 @@ public class StagingAsmUtils{
 
         if(invisible != null && !invisible.isEmpty()){
             for(AnnotationNode annotation : invisible){
-                Type oldType = typeCache.getObjectType(annotation.desc);
+                Type oldType = Type.getObjectType(annotation.desc);
                 Type newType = typeMap.get(oldType);
                 if(newType != null){
                     annotation.desc = newType.getInternalName();
@@ -410,5 +405,69 @@ public class StagingAsmUtils{
             visitor.visitEnd();
             return AsmUtils.getInstance().findMethod(classNode, name, description).get();
         }
+    }
+    
+    public static InsnList createMethodCall(int opcode, MethodType method){
+        InsnList patch = new InsnList();
+        //       final int opcode, final String owner, final String name, final String descriptor
+        switch(opcode){
+            case INVOKESTATIC:{
+                patch.add(new MethodInsnNode(
+                    opcode,
+                    method.getOwner().getInternalName(),
+                    method.getName(),
+                    method.getDescriptor().getDescriptor(),
+                    false
+                ));
+            } break;
+            
+            case INVOKEINTERFACE:
+            case INVOKESPECIAL:
+            case INVOKEVIRTUAL:{
+                new RuntimeException(String.format(
+                    "Implement createMethodCall with opcode %s",
+                    AsmUtils.getInstance().getOpcodeName(opcode)
+                )).printStackTrace();
+                System.exit(0);
+            } break;
+            
+            default:{
+                throw new RuntimeException(String.format(
+                    "Opcode %s is not a legal method opcode",
+                    opcode
+                ));
+            } /* break; */
+        }
+        return patch;
+    }
+
+    public static boolean replaceConstructors(ClassNode classNode, Type target, Type replacement){
+        AsmUtils utils = AsmUtils.getInstance();
+        boolean changed = false;
+
+        String owner = target.getInternalName();
+        MethodType constructor = new MethodType(target, "<init>", Type.VOID_TYPE);
+
+        for(MethodNode method : classNode.methods){
+            InsnList instructions = method.instructions;
+            for(TypeInsnNode newNode : utils.<TypeInsnNode>findMatchingNodes(instructions, (node)->{
+                if(node.getOpcode() == NEW){
+                    TypeInsnNode typeNode = (TypeInsnNode)node;
+                    return owner.equals(typeNode.desc);
+                }
+                return false;
+            })){
+                MethodInsnNode initNode = utils.findNextMethodCall(newNode, AsmUtils.METHOD_FLAG_IGNORE_DESCRIPTION, INVOKESPECIAL, constructor).get();
+                initNode.setOpcode(INVOKESTATIC);
+                initNode.owner = replacement.getInternalName();
+                initNode.name = "init";
+                String desc = initNode.desc;
+                initNode.desc = desc.substring(0, desc.length() - 1) + target.getDescriptor();
+                instructions.remove(newNode.getNext());
+                instructions.remove(newNode);
+                changed = true;
+            }
+        }
+        return changed;
     }
 }
