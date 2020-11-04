@@ -2,10 +2,13 @@ package net.gudenau.minecraft.fps.transformer.client;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.gudenau.minecraft.asm.api.v0.AsmUtils;
-import net.gudenau.minecraft.asm.api.v0.Identifier;
-import net.gudenau.minecraft.asm.api.v0.Transformer;
+import java.util.function.Supplier;
+import net.gudenau.minecraft.asm.api.v1.AsmUtils;
+import net.gudenau.minecraft.asm.api.v1.Identifier;
+import net.gudenau.minecraft.asm.api.v1.Transformer;
+import net.gudenau.minecraft.asm.api.v1.type.MethodType;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodInsnNode;
@@ -33,7 +36,6 @@ public class DisableRendererThreadChecks implements Transformer{
     
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
-        AsmUtils utils = AsmUtils.getInstance();
         boolean changed = false;
         
         for(MethodNode method : classNode.methods){
@@ -49,8 +51,9 @@ public class DisableRendererThreadChecks implements Transformer{
             ]
             INVOKESTATIC com/mojang/blaze3d/systems/RenderSystem.assertThread (Ljava/util/function/Supplier;)V
              */
+            MethodType assertThread = new MethodType(Type.getObjectType(RenderSystem), RenderSystem$assertThread, Type.VOID_TYPE, Type.getType(Supplier.class));
             List<AbstractInsnNode> badInstructions = new ArrayList<>();
-            for(MethodInsnNode methodCall : utils.findMethodCalls(method, Opcodes.INVOKESTATIC, RenderSystem, RenderSystem$assertThread, "(Ljava/util/function/Supplier;)V")){
+            for(MethodInsnNode methodCall : AsmUtils.findMethodCalls(method, 0, Opcodes.INVOKESTATIC, assertThread)){
                 AbstractInsnNode previousNode = methodCall.getPrevious();
                 if(previousNode.getType() != AbstractInsnNode.INVOKE_DYNAMIC_INSN){
                     continue;

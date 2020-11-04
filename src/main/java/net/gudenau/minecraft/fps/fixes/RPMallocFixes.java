@@ -1,8 +1,8 @@
 package net.gudenau.minecraft.fps.fixes;
 
 import net.gudenau.minecraft.fps.util.annotation.AssemblyTarget;
-import net.gudenau.minecraft.asm.api.v0.annotation.ForceBootloader;
-import net.gudenau.minecraft.asm.api.v0.annotation.ForceInline;
+import net.gudenau.minecraft.asm.api.v1.annotation.ForceBootloader;
+import net.gudenau.minecraft.asm.api.v1.annotation.ForceInline;
 import org.lwjgl.system.rpmalloc.RPmalloc;
 
 @ForceBootloader

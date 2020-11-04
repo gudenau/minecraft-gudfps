@@ -94,8 +94,13 @@ public class ReflectionHelper{
         return (Class<T>)loader.loadClass(name);
     }
     
+    @Deprecated
     public static <O, T extends O> MethodHandle findVirtual(Class<T> owner, O instance, String name, MethodType type) throws ReflectiveOperationException{
         return IMPL_LOOKUP.findVirtual(owner, name, type).bindTo(instance);
+    }
+    
+    public static <O, T extends O> MethodHandle findVirtual(Class<T> owner, O instance, String name, Class<?> type, Class<?>... params) throws ReflectiveOperationException{
+        return IMPL_LOOKUP.findVirtual(owner, name, MethodType.methodType(type, params)).bindTo(instance);
     }
     
     public static MethodHandle findStatic(Class<?> owner, String name, Class<?> returnType, Class<?>... params) throws ReflectiveOperationException{
@@ -108,6 +113,10 @@ public class ReflectionHelper{
     
     public static MethodHandle unreflect(Method method) throws IllegalAccessException{
         return IMPL_LOOKUP.unreflect(method);
+    }
+    
+    static MethodHandles.Lookup getLookup(){
+        return IMPL_LOOKUP;
     }
     
     private static final class UnsafeHelper{

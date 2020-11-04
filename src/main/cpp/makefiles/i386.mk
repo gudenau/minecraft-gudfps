@@ -1,0 +1,2 @@
+FLAGS_PCXX	:=	-m32
+FLAGS_PLD	:=	-m32

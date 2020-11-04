@@ -2,9 +2,9 @@ package net.gudenau.minecraft.fps.transformer;
 
 import java.util.List;
 
-import net.gudenau.minecraft.asm.api.v0.AsmUtils;
-import net.gudenau.minecraft.asm.api.v0.Identifier;
-import net.gudenau.minecraft.asm.api.v0.Transformer;
+import net.gudenau.minecraft.asm.api.v1.AsmUtils;
+import net.gudenau.minecraft.asm.api.v1.Identifier;
+import net.gudenau.minecraft.asm.api.v1.Transformer;
 import net.gudenau.minecraft.fps.util.ArrayUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -52,11 +52,9 @@ public class MathOptimizer implements Transformer{
     public boolean transform(ClassNode classNode, Flags flags){
         boolean changed = false;
 
-        AsmUtils utils = AsmUtils.getInstance();
-
         for(MethodNode method : classNode.methods){
             InsnList instructions = method.instructions;
-            List<InsnNode> isnNodes = utils.findMatchingNodes(instructions, (node)->{
+            List<InsnNode> isnNodes = AsmUtils.findMatchingNodes(instructions, (node)->{
                 if(node instanceof InsnNode){
                     InsnNode insnNode = (InsnNode)node;
                     return ArrayUtils.contains(BOTH, insnNode.getOpcode());

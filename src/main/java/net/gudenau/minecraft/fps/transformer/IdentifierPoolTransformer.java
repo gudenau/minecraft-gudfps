@@ -3,8 +3,8 @@ package net.gudenau.minecraft.fps.transformer;
 import org.objectweb.asm.Type;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.MappingResolver;
-import net.gudenau.minecraft.asm.api.v0.Identifier;
-import net.gudenau.minecraft.asm.api.v0.Transformer;
+import net.gudenau.minecraft.asm.api.v1.Identifier;
+import net.gudenau.minecraft.asm.api.v1.Transformer;
 import net.gudenau.minecraft.fps.util.StagingAsmUtils;
 import org.objectweb.asm.tree.ClassNode;
 

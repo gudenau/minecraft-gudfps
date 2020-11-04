@@ -5,6 +5,8 @@ import java.lang.invoke.MethodHandle;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+
+import net.gudenau.minecraft.fps.GudFPS;
 import net.gudenau.minecraft.fps.util.ReflectionHelper;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.MixinEnvironment;
@@ -16,7 +18,7 @@ public class Plugin implements IMixinConfigPlugin{
     private static final MethodHandle EasterEgger$getMixins;
     
     private static IMixinTransformer transformer = null;
-    
+
     static{
         MethodHandle getMixins;
         try{
@@ -34,6 +36,11 @@ public class Plugin implements IMixinConfigPlugin{
                 "getMixins",
                 List.class,
                 IMixinTransformer.class
+            );
+            GudFPS.init = ReflectionHelper.findStatic(
+                EasterEgger,
+                "gameInit",
+                void.class
             );
         }catch(Throwable ignored){
             // Not a gud build, just ignore it.

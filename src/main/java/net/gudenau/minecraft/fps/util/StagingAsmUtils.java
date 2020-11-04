@@ -1,12 +1,10 @@
 package net.gudenau.minecraft.fps.util;
 
-import net.gudenau.minecraft.asm.api.v0.AsmUtils;
-import net.gudenau.minecraft.asm.api.v0.TypeCache;
-import net.gudenau.minecraft.asm.api.v0.type.MethodType;
+import net.gudenau.minecraft.asm.api.v1.AsmUtils;
+import net.gudenau.minecraft.asm.api.v1.type.MethodType;
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 
-import java.lang.reflect.Method;
 import java.util.*;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -21,8 +19,7 @@ public class StagingAsmUtils{
         if(types == null || types.isEmpty()){
             return false;
         }
-
-        TypeCache Type = TypeCache.getTypeCache();
+        
         boolean changed = false;
 
         for(int i = 0; i < types.size(); i++){
@@ -378,7 +375,7 @@ public class StagingAsmUtils{
     }
 
     public static MethodNode findOrCreateMethod(ClassNode classNode, int access, String owner, String name, String description, String... exceptions){
-        Optional<MethodNode> optionalMethod = AsmUtils.getInstance().findMethod(classNode, name, description);
+        Optional<MethodNode> optionalMethod = AsmUtils.findMethod(classNode, name, description);
         if(optionalMethod.isPresent()){
             return optionalMethod.get();
         }else{
@@ -403,7 +400,7 @@ public class StagingAsmUtils{
             visitor.visitMaxs(1, 1);
 
             visitor.visitEnd();
-            return AsmUtils.getInstance().findMethod(classNode, name, description).get();
+            return AsmUtils.findMethod(classNode, name, description).get();
         }
     }
     
@@ -426,7 +423,7 @@ public class StagingAsmUtils{
             case INVOKEVIRTUAL:{
                 new RuntimeException(String.format(
                     "Implement createMethodCall with opcode %s",
-                    AsmUtils.getInstance().getOpcodeName(opcode)
+                    AsmUtils.getOpcodeName(opcode)
                 )).printStackTrace();
                 System.exit(0);
             } break;
@@ -442,7 +439,6 @@ public class StagingAsmUtils{
     }
 
     public static boolean replaceConstructors(ClassNode classNode, Type target, Type replacement){
-        AsmUtils utils = AsmUtils.getInstance();
         boolean changed = false;
 
         String owner = target.getInternalName();
@@ -450,14 +446,14 @@ public class StagingAsmUtils{
 
         for(MethodNode method : classNode.methods){
             InsnList instructions = method.instructions;
-            for(TypeInsnNode newNode : utils.<TypeInsnNode>findMatchingNodes(instructions, (node)->{
+            for(TypeInsnNode newNode : AsmUtils.<TypeInsnNode>findMatchingNodes(instructions, (node)->{
                 if(node.getOpcode() == NEW){
                     TypeInsnNode typeNode = (TypeInsnNode)node;
                     return owner.equals(typeNode.desc);
                 }
                 return false;
             })){
-                MethodInsnNode initNode = utils.findNextMethodCall(newNode, AsmUtils.METHOD_FLAG_IGNORE_DESCRIPTION, INVOKESPECIAL, constructor).get();
+                MethodInsnNode initNode = AsmUtils.findNextMethodCall(newNode, AsmUtils.METHOD_FLAG_IGNORE_DESCRIPTION, INVOKESPECIAL, constructor).get();
                 initNode.setOpcode(INVOKESTATIC);
                 initNode.owner = replacement.getInternalName();
                 initNode.name = "init";

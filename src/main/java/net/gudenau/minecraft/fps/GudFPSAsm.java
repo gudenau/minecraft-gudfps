@@ -4,15 +4,21 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import net.gudenau.minecraft.asm.api.v0.AsmInitializer;
-import net.gudenau.minecraft.asm.api.v0.AsmRegistry;
+import net.gudenau.minecraft.asm.api.v1.AsmInitializer;
+import net.gudenau.minecraft.asm.api.v1.AsmRegistry;
 import net.gudenau.minecraft.fps.transformer.*;
 import net.gudenau.minecraft.fps.transformer.client.DisableRendererThreadChecks;
+import net.gudenau.minecraft.fps.util.Config;
 import net.gudenau.minecraft.fps.util.LibraryLoader;
+import net.gudenau.minecraft.fps.util.NativeLoader;
 import org.lwjgl.system.Configuration;
 import org.lwjgl.system.rpmalloc.RPmalloc;
 
 public class GudFPSAsm implements AsmInitializer{
+    static{
+        NativeLoader.load();
+    }
+    
     @Override
     public void onInitializeAsm(){
         if(!System.getProperty("os.arch").contains("64")){
@@ -39,7 +45,7 @@ public class GudFPSAsm implements AsmInitializer{
         AsmRegistry registry = AsmRegistry.getInstance();
         registry.registerClassCache(new TransformerCache());
     
-        GudFPS.Config config = GudFPS.CONFIG;
+        Config config = GudFPS.CONFIG;
         boolean devel = false;
         try{
             devel = Files.isDirectory(Paths.get(GudFPSAsm.class.getProtectionDomain().getCodeSource().getLocation().toURI()));
@@ -52,6 +58,7 @@ public class GudFPSAsm implements AsmInitializer{
         config.disableRendererThreadChecks.doIf(true, ()->registry.registerTransformer(new DisableRendererThreadChecks()));
         config.identifierPool.doIf(true, ()->registry.registerTransformer(new IdentifierPoolTransformer()));
         if(devel){
+            config.avx.doIf(true, ()->registry.registerTransformer(new SimdTransformer()));
             config.removeBlockPos.doIf(true, ()->registry.registerTransformer(new BlockPosRemover()));
             config.rpmalloc.doIf(true, ()->registry.registerTransformer(new RPmallocTransformer()));
         }

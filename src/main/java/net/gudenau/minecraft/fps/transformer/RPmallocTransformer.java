@@ -3,9 +3,9 @@ package net.gudenau.minecraft.fps.transformer;
 import java.util.HashSet;
 import java.util.Set;
 
-import net.gudenau.minecraft.asm.api.v0.AsmUtils;
-import net.gudenau.minecraft.asm.api.v0.Identifier;
-import net.gudenau.minecraft.asm.api.v0.Transformer;
+import net.gudenau.minecraft.asm.api.v1.AsmUtils;
+import net.gudenau.minecraft.asm.api.v1.Identifier;
+import net.gudenau.minecraft.asm.api.v1.Transformer;
 import net.gudenau.minecraft.fps.util.StagingAsmUtils;
 import net.gudenau.minecraft.fps.util.Stats;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -32,12 +32,10 @@ public class RPmallocTransformer implements Transformer{
     
     @Override
     public boolean transform(ClassNode classNode, Flags flags){
-        AsmUtils utils = AsmUtils.getInstance();
-
         boolean changed = false;
     
         if(classNode.superName.equals("java/lang/Thread")){
-            utils.findMethod(classNode, "run", "()V").ifPresent((method)->{
+            AsmUtils.findMethod(classNode, "run", "()V").ifPresent((method)->{
                 method.instructions.insert(new MethodInsnNode(
                     INVOKESTATIC,
                     "net/gudenau/minecraft/fps/fixes/RPMallocFixes",
@@ -46,7 +44,7 @@ public class RPmallocTransformer implements Transformer{
                     false
                 ));
     
-                for(AbstractInsnNode node : utils.findReturns(method.instructions)){
+                for(AbstractInsnNode node : AsmUtils.findReturns(method.instructions)){
                     method.instructions.insertBefore(node, new MethodInsnNode(
                         INVOKESTATIC,
                         "net/gudenau/minecraft/fps/fixes/RPMallocFixes",
@@ -72,7 +70,7 @@ public class RPmallocTransformer implements Transformer{
             ));
     
             method = StagingAsmUtils.findOrCreateMethod(classNode, ACC_PUBLIC, "java/util/concurrent/ForkJoinWorkerThread", "onTermination", "(Ljava/lang/Throwable;)V");
-            for(InsnNode node : utils.findReturns(method.instructions)){
+            for(InsnNode node : AsmUtils.findReturns(method.instructions)){
                 method.instructions.insertBefore(node, new MethodInsnNode(
                     INVOKESTATIC,
                     "net/gudenau/minecraft/fps/fixes/RPMallocFixes",

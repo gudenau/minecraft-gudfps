@@ -4,7 +4,10 @@
   "package": "net.gudenau.minecraft.fps.mixin",
   "compatibilityLevel": "JAVA_8",
   "plugin": "net.gudenau.minecraft.fps.mixin.Plugin",
-  "mixins": [],
+  "mixins": [
+    "client.NativeImageAccessor",
+    "client.SpriteAccessor"
+  ],
   "client": [],
   "injectors": {
     "defaultRequire": 1
