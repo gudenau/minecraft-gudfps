@@ -160,6 +160,16 @@ public class ForEachRemover implements Transformer{
                     targetOpcode == INVOKEINTERFACE
                 ));
                 
+                // Return value of a foreach handle is not always void
+                switch (Type.getMethodType(targetHandle.getDesc()).getReturnType().getSize()) {
+                    case 2:
+                        patch.add(new InsnNode(POP2));
+                        break;
+                    case 1:
+                        patch.add(new InsnNode(POP));
+                    case 0:
+                }
+                
                 // }
                 patch.add(new JumpInsnNode(GOTO, continueNode));
                 patch.add(breakNode);
